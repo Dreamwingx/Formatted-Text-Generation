@@ -12,3 +12,10 @@
 ```bash
 pip install -r requirements.txt
 ```
+
+## github维护
+```bash
+git config --global http.sslVerify false
+git push -u origin main
+git config --global http.sslVerify true
+```

@@ -13,4 +13,6 @@ def split_docx_pipline(input_dir, output_dir, work_dir, days_to_keep):
     clean_old_logs(work_dir, days_to_keep=days_to_keep)
     logging.info("日志设置成功")
 
+    print(ai_chat("提取这段话中的数字：一去二三里，烟村四五家，亭台六七座，八九十枝花。"))
+
     return

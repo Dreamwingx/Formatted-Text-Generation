@@ -1,0 +1,4 @@
+[2025-10-11 11:19:05] INFO [logger.py:80 clean_old_logs()] - 日志文件清理完成，删除文件数量：0
+[2025-10-11 11:19:05] INFO [logger.py:94 clean_old_logs()] - 空目录清理完成，删除目录数量：0
+[2025-10-11 11:19:05] INFO [function.py:14 split_docx_pipline()] - 日志设置成功
+[2025-10-11 11:19:06] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
