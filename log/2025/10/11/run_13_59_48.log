@@ -1,0 +1,3 @@
+[2025-10-11 13:59:48] INFO [logger.py:80 clean_old_logs()] - 日志文件清理完成，删除文件数量：0
+[2025-10-11 13:59:48] INFO [logger.py:94 clean_old_logs()] - 空目录清理完成，删除目录数量：0
+[2025-10-11 13:59:48] INFO [function.py:16 split_docx_pipline()] - 日志设置成功

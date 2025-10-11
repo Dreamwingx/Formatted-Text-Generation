@@ -1,0 +1,7 @@
+[2025-10-11 14:07:06] INFO [logger.py:80 clean_old_logs()] - 日志文件清理完成，删除文件数量：0
+[2025-10-11 14:07:06] INFO [logger.py:94 clean_old_logs()] - 空目录清理完成，删除目录数量：0
+[2025-10-11 14:07:06] INFO [function.py:16 split_docx_pipline()] - 日志设置成功
+[2025-10-11 14:07:09] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+[2025-10-11 14:07:12] INFO [ai_api_client.py:140 ai_chat_with_progress()] - 提取这段话中的数字：一去二三里，烟村四五家，亭台六七座，八九十枝花。
+[2025-10-11 14:07:12] INFO [ai_api_client.py:141 ai_chat_with_progress()] - 这段话中包含的数字有：  
+一、二、三、四、五、六、七、八、九、十。

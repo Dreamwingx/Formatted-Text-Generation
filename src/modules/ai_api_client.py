@@ -1,10 +1,16 @@
 import json
 import logging
+import time
+from tqdm import tqdm
 from openai import OpenAI
 from pathlib import Path
 
 
 def get_config(task_type):
+    """
+    按照任务类型获取配置
+    task_type: "summarization"、 "merging"、 默认
+    """
     if task_type == "summarization":
         return {
             "system_prompt": (
@@ -89,3 +95,58 @@ def ai_chat(user_input, task_type="default"):
 
     # 7. 提取并返回模型的响应内容
     return response.choices[0].message.content
+
+
+def ai_chat_with_progress(user_input, task_type="default"):
+    """"
+    带进度条的ai处理函数
+    """
+    pbar = tqdm(total=5, desc="AI处理进度", unit="步骤")
+
+    try:
+        # 步骤1: 加载配置
+        pbar.set_description("加载配置")
+        config = get_config(task_type)
+        api_key, base_url = load_api_config()
+        pbar.update(1)
+        time.sleep(0.5)
+
+        # 步骤2: 初始化OpenAI
+        pbar.set_description("初始化OpenAI")
+        client = OpenAI(api_key=api_key, base_url=base_url)
+        pbar.update(1)
+        time.sleep(0.5)
+
+        # 步骤3: 构建消息
+        pbar.set_description("构建对话消息")
+        messages = [
+            {"role": "system", "content": config.get("system_prompt", "你是一个智能文档助手。")},
+            {"role": "user", "content": user_input}
+        ]
+        pbar.update(1)
+        time.sleep(0.5)
+
+        # 步骤4: 调用API
+        pbar.set_description("调用AI模型")
+        response = client.chat.completions.create(
+            model=config.get("model", "deepseek-chat"),
+            messages=messages,
+            temperature=config.get("temperature", 0.7),
+            max_tokens=config.get("max_tokens", 4096),
+            stream=config.get("stream", False)
+        )
+        pbar.update(1)
+        time.sleep(0.5)
+
+        # 步骤5: 完成
+        pbar.set_description("单次问答处理完成")
+        pbar.update(1)
+
+        # 保存日志
+        logging.info(user_input)
+        logging.info(response.choices[0].message.content)
+
+        return response.choices[0].message.content
+
+    finally:
+        pbar.close()
