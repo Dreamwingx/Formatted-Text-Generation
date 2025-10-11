@@ -6,11 +6,14 @@ from openai import OpenAI
 from pathlib import Path
 
 
-def get_config(task_type):
+def get_config(task_type, model_name):
     """
     按照任务类型获取配置
     task_type: "summarization"、 "merging"、 默认
     """
+    if model_name == "":
+        logging.warning(f"未传入正确model_name参数，请检查ai_api_config.json是否配置得当")
+        return
     if task_type == "summarization":
         return {
             "system_prompt": (
@@ -18,7 +21,7 @@ def get_config(task_type):
                 "请阅读用户提供的内容，提取核心信息，生成简洁明了的摘要。"
                 "摘要应覆盖关键信息，避免添加无关内容，且语言要通顺自然。"
             ),
-            "model": "deepseek-chat",
+            "model": model_name,
             "temperature": 0.3,
             "max_tokens": 1024,
             "stream": False
@@ -31,7 +34,7 @@ def get_config(task_type):
                 "尽量保留原文内容，保持原文表述风格，但需要去除重复信息，"
                 "合并后的内容连贯、逻辑清晰、表达自然。"
             ),
-            "model": "deepseek-chat",
+            "model": model_name,
             "temperature": 0.5,
             "max_tokens": 8192,
             "stream": False
@@ -40,7 +43,7 @@ def get_config(task_type):
         # 默认配置
         return {
             "system_prompt": "你是一个智能文档助手。",
-            "model": "deepseek-chat",
+            "model": model_name,
             "temperature": 0.7,
             "max_tokens": 4096,
             "stream": False
@@ -52,7 +55,7 @@ def load_api_config():
     config_path = Path(__file__).parent.parent / "ai_api_config.json"
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
-    return config["api_key"], config["base_url"]
+    return config["api_key"], config["base_url"], config["model_name"]
 
 
 def ai_chat(user_input, task_type="default"):
@@ -66,11 +69,12 @@ def ai_chat(user_input, task_type="default"):
     Returns:
         str: 大语言模型返回的响应内容
     """
-    # 1. 根据任务类型获取对应的配置（如系统提示词、模型参数等）
-    config = get_config(task_type)
 
-    # 2. 加载API密钥和基础URL（从配置文件或环境变量中读取）
-    api_key, base_url = load_api_config()
+    # 1. 加载API密钥和基础URL（从配置文件或环境变量中读取）
+    api_key, base_url, model_name = load_api_config()
+
+    # 2. 根据任务类型获取对应的配置（如系统提示词、模型参数等）
+    config = get_config(task_type, model_name)
 
     # 3. 初始化OpenAI客户端（兼容开源模型API，如DeepSeek、Qwen等）
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -106,8 +110,8 @@ def ai_chat_with_progress(user_input, task_type="default"):
     try:
         # 步骤1: 加载配置
         pbar.set_description("加载配置")
-        config = get_config(task_type)
-        api_key, base_url = load_api_config()
+        api_key, base_url, model_name = load_api_config()
+        config = get_config(task_type, model_name)
         pbar.update(1)
         time.sleep(0.5)
 
