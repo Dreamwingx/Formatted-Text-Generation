@@ -9,7 +9,7 @@ from pathlib import Path
 def get_config(task_type, model_name):
     """
     按照任务类型获取配置
-    task_type: "summarization"、 "merging"、 默认
+    task_type: "summarization"、 "merging"、"translation"、 默认
     """
     if model_name == "":
         logging.warning(f"未传入正确model_name参数，请检查ai_api_config.json是否配置得当")
@@ -36,6 +36,19 @@ def get_config(task_type, model_name):
             ),
             "model": model_name,
             "temperature": 0.5,
+            "max_tokens": 8192,
+            "stream": False
+        }
+    elif task_type == "translation":
+        return {
+            "system_prompt": (
+                "你是一个专业的文档翻译专家。"
+                "请将用户提供的文档内容准确翻译成目标语言，"
+                "保持原文的专业术语和核心含义，同时确保翻译结果符合目标语言的表达习惯，"
+                "译文应流畅自然、语义准确、风格贴切。"
+            ),
+            "model": model_name,
+            "temperature": 0.3,
             "max_tokens": 8192,
             "stream": False
         }

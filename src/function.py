@@ -16,6 +16,7 @@ def split_docx_pipline(input_dir, output_dir, work_dir, days_to_keep):
 
     print(ai_chat_with_progress("提取这段话中的数字：一去二三里，烟村四五家，亭台六七座，八九十枝花。"))
     print(ai_chat_with_progress("提取这段话中的数字：茅檐长扫净无苔，花木成畦手自栽。一水护田将绿绕，两山排闼送青来。"))
+    print(ai_chat_with_progress("An apple a day keeps doctor away.", "translation"))
 
 
     return

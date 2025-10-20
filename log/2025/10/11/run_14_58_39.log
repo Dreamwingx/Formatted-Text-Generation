@@ -1,4 +1,0 @@
-[2025-10-11 14:58:39] INFO [logger.py:79 clean_old_logs()] - 日志文件清理完成，删除文件数量：0
-[2025-10-11 14:58:39] INFO [logger.py:93 clean_old_logs()] - 空目录清理完成，删除目录数量：0
-[2025-10-11 14:58:39] INFO [function.py:14 split_docx_pipline()] - 日志设置成功
-[2025-10-11 14:58:39] WARNING [ai_api_client.py:15 get_config()] - 未传入正确model_name参数，请检查ai_api_config.json是否配置得当
