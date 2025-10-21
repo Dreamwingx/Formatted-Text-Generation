@@ -122,17 +122,17 @@ def ai_chat_with_progress(user_input, task_type="default"):
 
     try:
         # 步骤1: 加载配置
-        pbar.set_description("加载配置")
+        pbar.set_description("加载模型配置")
         api_key, base_url, model_name = load_api_config()
         config = get_config(task_type, model_name)
         pbar.update(1)
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         # 步骤2: 初始化OpenAI
         pbar.set_description("初始化OpenAI")
         client = OpenAI(api_key=api_key, base_url=base_url)
         pbar.update(1)
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         # 步骤3: 构建消息
         pbar.set_description("构建对话消息")
@@ -141,7 +141,7 @@ def ai_chat_with_progress(user_input, task_type="default"):
             {"role": "user", "content": user_input}
         ]
         pbar.update(1)
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         # 步骤4: 调用API
         pbar.set_description("调用AI模型")
@@ -153,7 +153,7 @@ def ai_chat_with_progress(user_input, task_type="default"):
             stream=config.get("stream", False)
         )
         pbar.update(1)
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         # 步骤5: 完成
         pbar.set_description("单次问答处理完成")
@@ -163,7 +163,12 @@ def ai_chat_with_progress(user_input, task_type="default"):
         logging.info(user_input)
         logging.info(response.choices[0].message.content)
 
-        return response.choices[0].message.content
+        result = response.choices[0].message.content
+        pbar.close()
+        print("\r" + " " * 100 + "\r", end="", flush=True)
+
+        return result
+
 
     finally:
         pbar.close()
