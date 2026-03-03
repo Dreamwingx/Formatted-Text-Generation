@@ -1,0 +1,3 @@
+[2026-03-02 11:13:38] INFO [preprocess.py:57 pipeline()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
+[2026-03-02 11:13:38] INFO [preprocess.py:31 _step_create_placeholder()] - 执行占位步骤：创建 sample.txt
+[2026-03-02 11:13:38] INFO [preprocess.py:62 pipeline()] - 管线执行完成

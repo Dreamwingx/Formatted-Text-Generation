@@ -21,23 +21,29 @@ def setup_logger(log_file=None, console=True):
     如果传入log_file，则同时保存日志到文件。
     可选参数console控制是否打印到控制台，默认为True。
     """
-    handlers = []
+    # 使用根 logger，先清除已有 handlers，确保多次调用时不会重复添加
+    root_logger = logging.getLogger()
+    # 移除已有 handlers
+    for h in list(root_logger.handlers):
+        root_logger.removeHandler(h)
+
+    root_logger.setLevel(logging.INFO)
+
+    fmt = logging.Formatter(
+        '[%(asctime)s] %(levelname)s [%(filename)s:%(lineno)d %(funcName)s()] - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
 
     if console:
-        handlers.append(logging.StreamHandler())  # 控制台输出
+        sh = logging.StreamHandler()
+        sh.setFormatter(fmt)
+        root_logger.addHandler(sh)
 
     if log_file:
-        # 确保日志目录存在
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
-        handlers.append(file_handler)
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format='[%(asctime)s] %(levelname)s [%(filename)s:%(lineno)d %(funcName)s()] - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        handlers=handlers
-    )
+        fh = logging.FileHandler(log_file, encoding='utf-8')
+        fh.setFormatter(fmt)
+        root_logger.addHandler(fh)
 
 def clean_old_logs(work_dir, days_to_keep=None):
     """

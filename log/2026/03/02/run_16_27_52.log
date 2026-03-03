@@ -1,0 +1,6 @@
+[2026-03-02 16:27:52] INFO [preprocess.py:132 pipeline()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
+[2026-03-02 16:27:52] INFO [preprocess.py:43 _step_file_collection()] - 选择文件 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\full.md 来自文件夹 大模型课题一任务书-2025.09.03-【终稿】_extract
+[2026-03-02 16:27:52] WARNING [preprocess.py:46 _step_file_collection()] - 存在复数文件，仅处理第一个
+[2026-03-02 16:27:52] INFO [preprocess.py:55 _step_file_collection()] - 文件位置：D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\full.md
+[2026-03-02 16:27:52] INFO [preprocess.py:112 _step_title_space_align()] - 未发现需要格式化的标题
+[2026-03-02 16:27:52] INFO [preprocess.py:139 pipeline()] - 管线执行完成

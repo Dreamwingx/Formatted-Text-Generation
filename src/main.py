@@ -1,4 +1,4 @@
-from src.function import split_docx_pipline
+from function import split_docx_pipline
 
 
 def main():
