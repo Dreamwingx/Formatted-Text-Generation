@@ -110,6 +110,87 @@ def _step_title_space_align(file_path: str, work_dir: str) -> None:
         logger.info("未发现需要格式化的标题")
 
 
+def _step_directory_extract(file_path: str, work_dir: str) -> None:
+    """从文档中提取目录/正文标题行号并输出。
+
+    - 寻找以 `#` 开头且文本部分包含“目”和“录”汉字的行，记为目录开始行。
+    - 目录行之后第一个非空行的汉字部分作为第一个标题。
+    - 在该标题之后 100 行范围内，寻找以 `#` 开头且汉字部分与第一个标题忽略空格后相同的行，
+      将其视为正文第一个标题。
+    - 最终在控制台打印这两个行号。所有匹配均忽略空格，仅对文字部分进行比较。
+    """
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception as e:
+        logger.error("读取文件失败 %s，错误：%s", file_path, e)
+        return
+
+    dir_line = None
+    first_title = None
+    first_title_line = None
+    # locate directory start
+    for idx, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith("#"):
+            text = stripped.lstrip("#").strip()
+            # remove spaces for matching
+            if "目" in text and "录" in text:
+                dir_line = idx + 1
+                break
+    if dir_line is None:
+        logger.info("未找到目录开始行")
+        return
+
+    # find next non-empty line after dir_line
+    for j in range(dir_line, len(lines)):
+        if lines[j].strip():
+            # extract Chinese characters only
+            first_title = "".join(re.findall(r"[\u4e00-\u9fff]+", lines[j]))
+            first_title_line = j + 1
+            break
+    if first_title is None:
+        logger.info("目录之后未找到第一个标题")
+        print(f"目录开始行: {dir_line}, 正文第一个标题行: 未找到")
+        return
+
+    # search within 100 lines for a header matching first_title
+    target = re.sub(r"\s+", "", first_title)
+    content_line = None
+    for k in range(first_title_line, min(len(lines), first_title_line + 100)):
+        stripped = lines[k].lstrip()
+        if stripped.startswith("#"):
+            text = stripped.lstrip("#").strip()
+            text_chinese = "".join(re.findall(r"[\u4e00-\u9fff]+", text))
+            if re.sub(r"\s+", "", text_chinese) == target:
+                content_line = k + 1
+                break
+    logger.info("目录开始行: %s, 正文第一个标题行: %s", dir_line, content_line if content_line is not None else '未找到')
+
+    # 若找到了正文第一个标题行，则提取并移除目录部分
+    if content_line is not None:
+        start_idx = dir_line - 1
+        end_idx = content_line - 1  # up to previous line
+        directory_lines = lines[start_idx:end_idx]
+        # 写入 directory.txt
+        out_dir = os.path.dirname(file_path)
+        try:
+            with open(os.path.join(out_dir, "directory.txt"), "w", encoding="utf-8") as f:
+                f.writelines(directory_lines)
+        except Exception as e:
+            logger.error("写入目录文件失败 %s，错误：%s", os.path.join(out_dir, "directory.txt"), e)
+        # 从原始文件中移除目录段
+        remaining = lines[:start_idx] + lines[end_idx:]
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.writelines(remaining)
+        except Exception as e:
+            logger.error("写回原始文件失败 %s，错误：%s", file_path, e)
+
+
 def pipeline(output_dir: str, work_dir: str) -> Optional[str]:
     """
     执行工作管线
@@ -136,6 +217,7 @@ def pipeline(output_dir: str, work_dir: str) -> Optional[str]:
     selected_path = _step_file_collection(output_dir, work_dir)
     if selected_path:
         _step_title_space_align(selected_path, work_dir)
+        _step_directory_extract(selected_path, work_dir)
 
     logger.info("管线执行完成")
 
