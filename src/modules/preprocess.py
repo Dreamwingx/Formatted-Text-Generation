@@ -110,6 +110,131 @@ def _step_title_space_align(file_path: str, work_dir: str) -> None:
         logger.info("未发现需要格式化的标题")
 
 
+def _step_bracket_format(file_path: str, work_dir: str) -> None:
+    """规范化括号格式。
+
+    - 允许单个后括号，如“1）”。
+    - 对成对出现的括号，允许英文对 ``()`` 或中文对 ``（）``。
+    - 如果前括号为英文，则追踪到的后括号不得为中文，反之亦然；
+      若出现混合（英文前+中文后，或中文前+英文后），则把后括号
+      转换成与前括号匹配的类型。
+    - 输入为 ``selected_path`` 指定的文件，直接在原文件中修改。
+    """
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            text = f.read()
+    except Exception as e:
+        logger.error("读取文件失败 %s，错误：%s", file_path, e)
+        return
+
+    stack = []
+    changed = False
+    result_chars = []
+
+    for ch in text:
+        if ch in "(（":
+            stack.append(ch)
+            result_chars.append(ch)
+        elif ch in ")）":
+            if stack:
+                opening = stack.pop()
+                # mismatched pair
+                if opening == "(" and ch == "）":
+                    ch = ")"
+                    changed = True
+                elif opening == "（" and ch == ")":
+                    ch = "）"
+                    changed = True
+            else:
+                # no opening, single closing allowed
+                pass
+            result_chars.append(ch)
+        else:
+            result_chars.append(ch)
+    
+    if changed:
+        # count mismatches by comparing output to input
+        formatted = ''.join(result_chars)
+        num = sum(1 for a, b in zip(text, formatted) if a != b)
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(formatted)
+            logger.info("已格式化括号 %d 个", num)
+        except Exception as e:
+            logger.error("写回文件失败 %s，错误：%s", file_path, e)
+    else:
+        logger.info("未发现需要格式化的括号")
+
+
+def _step_extract_level_zero(file_path: str, work_dir: str) -> None:
+    """提取0级标题及其内容。
+
+    - 查找严格匹配 "# " + 汉字开头 的行，视为0级标题。
+    - 从该行开始，收集直至下一个 "#" 出现前的所有文本块。
+    - 将所有这样提取的段落统一写入同目录下的 ``addition.txt`` 文件。
+    - 从源文件中删除这些内容。
+    """
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception as e:
+        logger.error("读取文件失败 %s，错误：%s", file_path, e)
+        return
+
+    # 正则匹配：以"# "开头，第3个字符是汉字
+    level_zero_re = re.compile(r'^# [\u4e00-\u9fff]')
+    
+    extracted_content = []
+    lines_to_remove = set()  # 记录要删除的行号
+    
+    i = 0
+    while i < len(lines):
+        if level_zero_re.match(lines[i]):
+            # 找到0级标题
+            start = i
+            # 从下一行开始，直到遇到以#开头的行
+            j = i + 1
+            while j < len(lines):
+                if lines[j].lstrip().startswith("#"):
+                    break
+                j += 1
+            # 收集从start到j-1的所有行
+            for k in range(start, j):
+                extracted_content.append(lines[k])
+                lines_to_remove.add(k)
+            i = j
+        else:
+            i += 1
+    
+    # 如果找到了内容，写入addition.txt并删除源文件中的内容
+    if extracted_content:
+        out_dir = os.path.dirname(file_path)
+        try:
+            with open(os.path.join(out_dir, "addition.txt"), "w", encoding="utf-8") as f:
+                f.writelines(extracted_content)
+            logger.info("已提取0级标题内容，共 %d 行", len(extracted_content))
+        except Exception as e:
+            logger.error("写入addition.txt失败 %s，错误：%s", os.path.join(out_dir, "addition.txt"), e)
+            return
+        
+        # 从源文件中删除
+        remaining = [lines[k] for k in range(len(lines)) if k not in lines_to_remove]
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.writelines(remaining)
+            logger.info("已从源文件中删除0级标题内容")
+        except Exception as e:
+            logger.error("写回源文件失败 %s，错误：%s", file_path, e)
+    else:
+        logger.info("未找到0级标题")
+
+
 def _step_directory_extract(file_path: str, work_dir: str) -> None:
     """从文档中提取目录/正文标题行号并输出。
 
@@ -201,6 +326,10 @@ def pipeline(output_dir: str, work_dir: str) -> Optional[str]:
        - 记录来源文件夹并在输出目录生成结果
        - 如果超过一个文件触发警告
     3. 对找到的 ``full.md`` 文件进行标题空格对齐处理
+    4. 对文中括号进行规范化处理，避免中英文混用等问题。
+    5. 提取0级标题（"# "开头）及其后续内容，写入 ``addition.txt`` 并从源文件删除。
+    6. 提取目录和正文首标题行号，并从源文档中删除目录部分写入单独的
+       ``directory.txt``。
 
     返回值:
         If a ``full.md`` was found, its absolute path is returned; otherwise ``None``.
@@ -217,7 +346,10 @@ def pipeline(output_dir: str, work_dir: str) -> Optional[str]:
     selected_path = _step_file_collection(output_dir, work_dir)
     if selected_path:
         _step_title_space_align(selected_path, work_dir)
-        _step_directory_extract(selected_path, work_dir)
+        # _step_directory_extract(selected_path, work_dir)
+        _step_bracket_format(selected_path, work_dir)
+        _step_extract_level_zero(selected_path, work_dir)
+        
 
     logger.info("管线执行完成")
 
