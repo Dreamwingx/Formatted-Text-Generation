@@ -3,7 +3,7 @@ import os
 import re
 from typing import Optional
 
-# use absolute import so script can run directly
+from ai_api_client import ai_chat_with_progress
 from logger import get_log_file_path, setup_logger
 
 
@@ -25,7 +25,7 @@ def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
 
     logger = logging.getLogger(__name__)
 
-    candidates = []  # list of (folder_name, file_path)
+    candidates = []  # 列表，包含 (文件夹名, 文件路径)
     if os.path.isdir(output_dir):
         for entry in sorted(os.listdir(output_dir)):
             subdir = os.path.join(output_dir, entry)
@@ -68,7 +68,7 @@ def _step_title_space_align(file_path: str, work_dir: str) -> None:
     heading_re = re.compile(r'^(#+)\s*(.*)$')
     number_re = re.compile(r'^([（(]?\d+(?:\.\d+)*[）)]?)[\.、．\s　]*(.*)$')
 
-    # file_path is expected to be a single full.md file
+    # 预期 file_path 是单个 full.md 文件
     if not os.path.isfile(file_path):
         logger.warning("文件不存在，无法格式化标题：%s", file_path)
         return
@@ -141,7 +141,7 @@ def _step_bracket_format(file_path: str, work_dir: str) -> None:
         elif ch in ")）":
             if stack:
                 opening = stack.pop()
-                # mismatched pair
+                # 不匹配的括号对
                 if opening == "(" and ch == "）":
                     ch = ")"
                     changed = True
@@ -149,14 +149,14 @@ def _step_bracket_format(file_path: str, work_dir: str) -> None:
                     ch = "）"
                     changed = True
             else:
-                # no opening, single closing allowed
+                # 没有对应的左括号，允许单个右括号
                 pass
             result_chars.append(ch)
         else:
             result_chars.append(ch)
     
     if changed:
-        # count mismatches by comparing output to input
+        # 通过比较输入和输出来计算不匹配的数量
         formatted = ''.join(result_chars)
         num = sum(1 for a, b in zip(text, formatted) if a != b)
         try:
@@ -257,12 +257,12 @@ def _step_directory_extract(file_path: str, work_dir: str) -> None:
     dir_line = None
     first_title = None
     first_title_line = None
-    # locate directory start
+    # 定位目录开始位置
     for idx, line in enumerate(lines):
         stripped = line.lstrip()
         if stripped.startswith("#"):
             text = stripped.lstrip("#").strip()
-            # remove spaces for matching
+            # 删除空格以进行匹配
             if "目" in text and "录" in text:
                 dir_line = idx + 1
                 break
@@ -270,10 +270,10 @@ def _step_directory_extract(file_path: str, work_dir: str) -> None:
         logger.info("未找到目录开始行")
         return
 
-    # find next non-empty line after dir_line
+    # 查找 dir_line 之后的第一个非空行
     for j in range(dir_line, len(lines)):
         if lines[j].strip():
-            # extract Chinese characters only
+            # 仅提取汉字
             first_title = "".join(re.findall(r"[\u4e00-\u9fff]+", lines[j]))
             first_title_line = j + 1
             break
@@ -282,10 +282,10 @@ def _step_directory_extract(file_path: str, work_dir: str) -> None:
         print(f"目录开始行: {dir_line}, 正文第一个标题行: 未找到")
         return
 
-    # search within 100 lines for a header matching first_title
+    # 在随后100行内搜索与第一个标题匹配的标题行
     target = re.sub(r"\s+", "", first_title)
     content_line = None
-    for k in range(first_title_line, min(len(lines), first_title_line + 100)):
+    for k in range(first_title_line, min(len(lines), first_title_line + 100)): # type: ignore
         stripped = lines[k].lstrip()
         if stripped.startswith("#"):
             text = stripped.lstrip("#").strip()
@@ -316,6 +316,84 @@ def _step_directory_extract(file_path: str, work_dir: str) -> None:
             logger.error("写回原始文件失败 %s，错误：%s", file_path, e)
 
 
+def _step_remove_trailing_noise(file_path: str, work_dir: str) -> None:
+    """利用大模型清理文末噪声并更新源文件。
+
+    - 找到文件中最后一个以 `#` 开头的标题行，取该行及其之后的所有内容作为待处理部分。
+    - 将该部分原始内容保存到同目录下的 ``tailing_noise.txt`` 文件。
+    - 构造结构化 prompt 将该部分交给 `ai_chat`（调用 `ai_api_client.py` 中的接口）处理，
+      要求模型去除文末噪声（例如盖章页、附页、与最后一级标题下正文格式或内容明显不符的页眉/页脚/附加页等），
+      保留属于最后一级标题下的实际内容，其他部分不变。
+    - 将模型返回的清理后段落与原始文件中最后一级标题之前的内容拼接，并写回源文件。
+    """
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception as e:
+        logger.error("读取文件失败 %s，错误：%s", file_path, e)
+        return
+
+    last_header_idx = None
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("#"):
+            last_header_idx = i
+
+    if last_header_idx is None:
+        logger.info("未找到任何标题，跳过后噪声去除：%s", file_path)
+        return
+
+    tail_text = "".join(lines[last_header_idx:])
+
+    # 保存原始文末内容到 tailing_noise.txt
+    out_dir = os.path.dirname(file_path)
+    noise_file = os.path.join(out_dir, "tailing_noise.txt")
+    try:
+        with open(noise_file, "w", encoding="utf-8") as f:
+            f.write(tail_text)
+        logger.info("已保存原始文末内容到 %s", noise_file)
+    except Exception as e:
+        logger.error("写入噪声文件失败 %s，错误：%s", noise_file, e)
+        return
+
+    # 构造结构化 prompt，明确输入范围
+    prompt = (
+        "【输入内容】\n"
+        "下面是文档从最后一个标题开始到文末的完整内容。请根据以下指示进行处理：\n\n"
+        "【输入开始】\n"
+        + tail_text
+        + "\n【输入结束】\n\n"
+        "【处理指示】\n"
+        "1. 去除文末明显的噪声，例如：盖章页、附件页、与最后一级标题下正文格式/内容明显不符的页眉/页脚/申明/赘余附加页等。\n"
+        "2. 保留属于最后一级标题下的实际正文内容，不要改动正文部分。\n"
+        "3. 输出仅包含清理后的文本，不要附加任何解释、标记或多余说明。\n\n"
+        "【输出要求】\n"
+        "直接返回清理后的内容，格式与原文一致。"
+    )
+
+    try:
+        cleaned_tail = ai_chat_with_progress(prompt, task_type="merging")
+    except Exception as e:
+        logger.error("调用AI接口失败，无法执行后噪声去除：%s", e)
+        return
+
+    # 确保 cleaned_tail 以换行结束
+    if not cleaned_tail.endswith("\n"):
+        cleaned_tail = cleaned_tail + "\n"
+
+    cleaned_full = "".join(lines[:last_header_idx]) + cleaned_tail
+
+    # 将清理后的内容写回原文件
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(cleaned_full)
+        logger.info("已将清理后的文档内容写回原文件：%s", file_path)
+    except Exception as e:
+        logger.error("写回原文件失败 %s，错误：%s", file_path, e)
+
+
 def pipeline(output_dir: str, work_dir: str) -> Optional[str]:
     """
     执行工作管线
@@ -332,7 +410,7 @@ def pipeline(output_dir: str, work_dir: str) -> Optional[str]:
        ``directory.txt``。
 
     返回值:
-        If a ``full.md`` was found, its absolute path is returned; otherwise ``None``.
+        如果找到了 ``full.md`` 文件，返回其绝对路径；否则返回 ``None``。
     """
 
     # 日志设置
@@ -343,12 +421,19 @@ def pipeline(output_dir: str, work_dir: str) -> Optional[str]:
     logger.info("管线开始，output_dir=%s work_dir=%s", output_dir, work_dir)
 
     # 执行各个处理步骤
+    # 寻找需要处理的文件
     selected_path = _step_file_collection(output_dir, work_dir)
     if selected_path:
+        # 处理多余空格
         _step_title_space_align(selected_path, work_dir)
-        # _step_directory_extract(selected_path, work_dir)
+        # 提取目录部分到txt文件
+        _step_directory_extract(selected_path, work_dir)
+        # 规范化括号格式
         _step_bracket_format(selected_path, work_dir)
-        _step_extract_level_zero(selected_path, work_dir)
+        # 提取树以外的噪声内容到txt文件
+        # _step_extract_level_zero(selected_path, work_dir)
+        # 后噪声去除（调用大模型清理文末不相关页）
+        _step_remove_trailing_noise(selected_path, work_dir)
         
 
     logger.info("管线执行完成")

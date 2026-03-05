@@ -3,17 +3,18 @@ import logging
 import time
 from tqdm import tqdm
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 from pathlib import Path
 
 
-def get_config(task_type, model_name):
+def get_config(task_type, model_name) -> dict:
     """
     按照任务类型获取配置
     task_type: "summarization"、 "merging"、"translation"、 默认
     """
     if model_name == "":
         logging.warning(f"未传入正确model_name参数，请检查ai_api_config.json是否配置得当")
-        return
+        return {}
     if task_type == "summarization":
         return {
             "system_prompt": (
@@ -93,7 +94,7 @@ def ai_chat(user_input, task_type="default"):
     client = OpenAI(api_key=api_key, base_url=base_url)
 
     # 4. 构建对话消息列表
-    messages = [
+    messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": config.get("system_prompt", "你是一个智能文档助手。")},
         {"role": "user", "content": user_input}
     ]
@@ -136,7 +137,7 @@ def ai_chat_with_progress(user_input, task_type="default"):
 
         # 步骤3: 构建消息
         pbar.set_description("构建对话消息")
-        messages = [
+        messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": config.get("system_prompt", "你是一个智能文档助手。")},
             {"role": "user", "content": user_input}
         ]
