@@ -1,0 +1,6 @@
+[2026-03-30 10:23:50] INFO [collecttree.py:139 collecttree()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
+[2026-03-30 10:23:50] INFO [collecttree.py:42 _step_file_collection()] - 选择文件 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\full.md 来自文件夹 大模型课题一任务书-2025.09.03-【终稿】_extract
+[2026-03-30 10:23:50] WARNING [collecttree.py:45 _step_file_collection()] - 存在复数文件，仅处理第一个
+[2026-03-30 10:23:50] INFO [collecttree.py:145 collecttree()] - 开始处理文件：D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\full.md
+[2026-03-30 10:23:50] INFO [collecttree.py:127 _save_file()] - 成功保存treenode.json到 D:\compile\Test\output\treenode.json，共处理 194 个内容块
+[2026-03-30 10:23:50] INFO [collecttree.py:149 collecttree()] - 处理完成，输出文件：D:\compile\Test\output\treenode.json

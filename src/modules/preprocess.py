@@ -374,7 +374,7 @@ def _step_remove_trailing_noise(file_path: str, work_dir: str) -> None:
     )
 
     try:
-        cleaned_tail = ai_chat_with_progress(prompt, task_type="merging")
+        cleaned_tail = ai_chat_with_progress(prompt, log_to_console=False)
     except Exception as e:
         logger.error("调用AI接口失败，无法执行后噪声去除：%s", e)
         return

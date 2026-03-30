@@ -72,13 +72,15 @@ def load_api_config():
     return config["api_key"], config["base_url"], config["model_name"]
 
 
-def ai_chat(user_input, task_type="default"):
+def ai_chat(user_input, task_type="default", log_to_console=True):
     """"
     调用大语言模型API进行对话交互，根据任务类型使用不同配置
 
     Args:
         user_input (str): 用户输入的提示词或问题
         task_type (str): 任务类型，可选值包括 "summarization"（摘要）、"merging"（合并）
+        log_to_console (bool): 是否同时输出日志到控制台，默认True（同时保存到文件和输出于控制台）
+                              False时只保存在日志文件
 
     Returns:
         str: 大语言模型返回的响应内容
@@ -108,16 +110,36 @@ def ai_chat(user_input, task_type="default"):
         stream=config.get("stream", False)
     )
     # 6.保存日志
+    if not log_to_console:
+        # 只保存到文件，临时禁用控制台输出
+        logger = logging.getLogger()
+        console_handlers = []
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                console_handlers.append(handler)
+                handler.setLevel(logging.CRITICAL + 1)  # 禁用输出
+    
     logging.info(user_input)
     logging.info(response.choices[0].message.content)
+    
+    if not log_to_console:
+        # 恢复控制台输出
+        for handler in console_handlers:
+            handler.setLevel(logging.INFO)
 
     # 7. 提取并返回模型的响应内容
     return response.choices[0].message.content
 
 
-def ai_chat_with_progress(user_input, task_type="default"):
-    """"
+def ai_chat_with_progress(user_input, task_type="default", log_to_console=True):
+    """
     带进度条的ai处理函数
+    
+    Args:
+        user_input (str): 用户输入的提示词或问题
+        task_type (str): 任务类型
+        log_to_console (bool): 是否同时输出日志到控制台，默认True（同时保存到文件和输出于控制台）
+                              False时只保存在日志文件
     """
     pbar = tqdm(total=5, desc="AI处理进度", unit="步骤")
 
@@ -161,8 +183,22 @@ def ai_chat_with_progress(user_input, task_type="default"):
         pbar.update(1)
 
         # 保存日志
+        if not log_to_console:
+            # 只保存到文件，临时禁用控制台输出
+            logger = logging.getLogger()
+            console_handlers = []
+            for handler in logger.handlers:
+                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                    console_handlers.append(handler)
+                    handler.setLevel(logging.CRITICAL + 1)  # 禁用输出
+        
         logging.info(user_input)
         logging.info(response.choices[0].message.content)
+        
+        if not log_to_console:
+            # 恢复控制台输出
+            for handler in console_handlers:
+                handler.setLevel(logging.INFO)
 
         result = response.choices[0].message.content
         pbar.close()
