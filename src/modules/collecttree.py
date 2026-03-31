@@ -124,7 +124,7 @@ def _get_level(serial: str, is_standard: bool, last_standard_level: int,
             non_standard_map[serial] = last_standard_level + 1
         return non_standard_map[serial]
 
-def function(selected_path: str, output_dir: str) -> Optional[str]:
+def _step_generate_tree_nodes(selected_path: str, output_dir: str) -> Optional[str]:
     """解析markdown文件并生成包含结构化节点的json文件。
     
     参数:
@@ -181,7 +181,8 @@ def function(selected_path: str, output_dir: str) -> Optional[str]:
                 "题目": title,
                 "层级": str(level),
                 "正文": "",
-                "正文字数": 0
+                "正文字数": 0,
+                "不可修改": 0
             }
         else:
             # 添加内容到当前块的正文
@@ -221,7 +222,7 @@ def function(selected_path: str, output_dir: str) -> Optional[str]:
             if parent_node["子节点"] == 0:
                 parent_node["子节点"] = current_node_num
         
-        # 查找兄弟节点（同层的前一个节点）
+        # 查找兄弟节点（同层的后一个节点）
         if current_level in level_stack:
             sibling_idx = level_stack[current_level]
             sibling_node = nodes[sibling_idx]
@@ -235,7 +236,8 @@ def function(selected_path: str, output_dir: str) -> Optional[str]:
         for level in levels_to_remove:
             del level_stack[level]
     
-    # 保存为json文件
+    # 保存为json文件，生成在与 full.md 相同的文件夹中
+    output_dir = os.path.dirname(selected_path)
     output_file = os.path.join(output_dir, "treenode.json")
     try:
         data = {
@@ -251,6 +253,163 @@ def function(selected_path: str, output_dir: str) -> Optional[str]:
         logger.error("保存json文件失败 %s，错误：%s", output_file, e)
         return None
 
+
+def _step_output_directory(tree_json_path: str) -> Optional[str]:
+    """读取 treenode.json 并生成 treedirectory.txt。
+
+    输出格式为：
+        编号 序号 题目
+    """
+    logger = logging.getLogger(__name__)
+
+    try:
+        with open(tree_json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        logger.error("读取treenode.json失败 %s，错误：%s", tree_json_path, e)
+        return None
+
+    nodes = data.get("nodes", [])
+    if not isinstance(nodes, list):
+        logger.error("treenode.json中的nodes格式不正确: %s", type(nodes).__name__)
+        return None
+
+    output_dir = os.path.dirname(tree_json_path)
+    output_file = os.path.join(output_dir, "treedirectory.txt")
+
+    try:
+        with open(output_file, "w", encoding="utf-8") as f:
+            for node in nodes:
+                line = f"{node.get('编号', '')} {node.get('序号', '')} {node.get('题目', '')}\n"
+                f.write(line)
+        logger.info("成功生成目录文件 %s", output_file)
+        return output_file
+    except Exception as e:
+        logger.error("保存目录文件失败 %s，错误：%s", output_file, e)
+        return None
+
+
+def _step_annotate_directory_with_ai(tree_directory_path: str) -> Optional[str]:
+    """调用大模型分析 treedirectory.txt 并生成 treedirectorynew.txt。"""
+    logger = logging.getLogger(__name__)
+
+    if not os.path.isfile(tree_directory_path):
+        logger.error("目录文件不存在，无法生成 treedirectorynew.txt：%s", tree_directory_path)
+        return None
+
+    try:
+        with open(tree_directory_path, "r", encoding="utf-8") as f:
+            directory_text = f.read()
+    except Exception as e:
+        logger.error("读取目录文件失败 %s，错误：%s", tree_directory_path, e)
+        return None
+
+    prompt = (
+        "我将提供一个项目任务书的标题清单（按行排列）。请你逐行分析每个标题，并按照以下规则在每行末尾添加标记：\n"
+        "标记为 1：该标题属于项目任务书中的通用固定结构，无论项目主题如何变化，这些标题应当保留（例如：“研究目标”、“研究内容”、“技术指标”等）。\n"
+        "标记为 0：该标题在仿写其他任务书时需要被替换或重写（例如：“HZY行业特色保障措施”、“HZY专业大模型应用”等）。\n"
+        # 这个继承规则可以思考一下有没有必要性
+        "继承规则：若某一级标题标记为 0，则其所有下级标题必须同样标记为 0。\n"
+        "请逐行输出分析结果，保持原有顺序和层级格式，仅在行末添加空格后加上 1 或 0，不要增加其他任何内容、符号、介绍。"
+        "\n"
+        "示例输出格式如下：\n"
+        "1 1.1 研究目标 1\n"
+        "0 1.2 HZY行业方案 0\n"
+        "\n"
+        "输入内容如下：\n"
+        + directory_text
+    )
+
+    try:
+        ai_result = ai_chat_with_progress(prompt, log_to_console=False)
+    except Exception as e:
+        logger.error("调用AI接口失败，无法生成 treedirectorynew.txt：%s", e)
+        return None
+
+    output_dir = os.path.dirname(tree_directory_path)
+    output_file = os.path.join(output_dir, "treedirectorynew.txt")
+    try:
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(ai_result)
+        logger.info("成功生成AI标注目录文件 %s", output_file)
+        return output_file
+    except Exception as e:
+        logger.error("保存 treedirectorynew.txt 失败 %s，错误：%s", output_file, e)
+        return None
+
+
+def _step_apply_nonmodifiable_flags(tree_json_path: str, annotated_directory_path: str) -> Optional[str]:
+    """将 treedirectorynew.txt 中的最后标识写回 treenode.json 的不可修改字段。"""
+    logger = logging.getLogger(__name__)
+
+    if not os.path.isfile(tree_json_path):
+        logger.error("treenode.json 文件不存在，无法更新不可修改标识：%s", tree_json_path)
+        return None
+    if not os.path.isfile(annotated_directory_path):
+        logger.error("treedirectorynew.txt 文件不存在，无法更新不可修改标识：%s", annotated_directory_path)
+        return None
+
+    try:
+        with open(tree_json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        logger.error("读取 treenode.json 失败 %s，错误：%s", tree_json_path, e)
+        return None
+
+    nodes = data.get("nodes", [])
+    if not isinstance(nodes, list):
+        logger.error("treenode.json 中的 nodes 不是列表: %s", type(nodes).__name__)
+        return None
+
+    try:
+        with open(annotated_directory_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception as e:
+        logger.error("读取 treedirectorynew.txt 失败 %s，错误：%s", annotated_directory_path, e)
+        return None
+
+    id_to_flag = {}
+    for line in lines:
+        text = line.strip()
+        if not text:
+            continue
+        parts = text.split()
+        if len(parts) < 2:
+            continue
+        try:
+            node_id = int(parts[0])
+            flag = int(parts[-1])
+            id_to_flag[node_id] = 1 if flag else 0
+        except ValueError:
+            continue
+
+    if not id_to_flag:
+        logger.warning("未从 treedirectorynew.txt 中解析到任何编号标识")
+
+    updated_count = 0
+    for node in nodes:
+        node_id = node.get("编号")
+        try:
+            node_key = int(node_id)
+        except (TypeError, ValueError):
+            continue
+        if node_key in id_to_flag:
+            node["不可修改"] = id_to_flag[node_key]
+            updated_count += 1
+
+    if updated_count == 0:
+        logger.warning("未在 treenode.json 中匹配到任何编号以更新不可修改标识")
+
+    try:
+        with open(tree_json_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        logger.info("成功将 %d 个节点的不可修改标识写入 %s", updated_count, tree_json_path)
+        return tree_json_path
+    except Exception as e:
+        logger.error("保存 treenode.json 失败 %s，错误：%s", tree_json_path, e)
+        return None
+
+
 def collecttree(output_dir: str, work_dir: str):
     # 日志设置
     log_file = get_log_file_path(work_dir)
@@ -263,13 +422,15 @@ def collecttree(output_dir: str, work_dir: str):
     # 寻找需要处理的文件
     selected_path = _step_file_collection(output_dir, work_dir)
     if selected_path:
-        logger.info("开始处理文件：%s", selected_path)
-        # 处理文件并生成treenode.json
-        result = function(selected_path, output_dir)
-        if result:
-            logger.info("处理完成，输出文件：%s", result)
-        else:
-            logger.error("处理文件失败")
+        json_path = _step_generate_tree_nodes(selected_path, output_dir)
+        if json_path:
+            directory_path = _step_output_directory(json_path)
+            if directory_path:
+                annotated_path = _step_annotate_directory_with_ai(directory_path)
+                if annotated_path:
+                    _step_apply_nonmodifiable_flags(json_path, annotated_path)
+    else:
+        logger.warning("未找到可处理的 full.md 文件")
 
 
 if __name__ == "__main__":
