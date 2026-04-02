@@ -3,8 +3,8 @@ import os
 import re
 from typing import Optional
 
-from ai_api_client import ai_chat_with_progress
-from logger import get_log_file_path, setup_logger
+from .ai_api_client import ai_chat_with_progress
+from .logger import get_log_file_path, setup_logger
 
 
 def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
@@ -394,7 +394,7 @@ def _step_remove_trailing_noise(file_path: str, work_dir: str) -> None:
         logger.error("写回原文件失败 %s，错误：%s", file_path, e)
 
 
-def pipeline(output_dir: str, work_dir: str) -> Optional[str]:
+def preprocess(output_dir: str, work_dir: str) -> Optional[str]:
     """
     执行工作管线
 
@@ -453,5 +453,5 @@ if __name__ == "__main__":
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(work_dir, exist_ok=True)
 
-    pipeline(output_dir, work_dir)
+    preprocess(output_dir, work_dir)
 

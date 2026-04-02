@@ -15,9 +15,7 @@ def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
     - 如果找到多个，只处理第一个并记录警告。
     - 处理意味着：
         * 日志输出哪个子目录包含被选中的文件。
-        * 在 ``output_dir`` 中生成一个 ``filecollection_result.txt``，
-          内容是被选中文件的文件夹名。
-    - 如果根本未找到任何 ``full.md``，记录一个警告。
+        - 如果根本未找到任何 ``full.md``，记录一个警告。
 
     返回值:
         选中的 ``full.md`` 文件的绝对路径；如果未找到则返回 ``None``。
@@ -43,13 +41,6 @@ def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
 
     if len(candidates) > 1:
         logger.warning("存在复数文件，仅处理第一个")
-
-    result_file = os.path.join(output_dir, "filecollection_result.txt")
-    try:
-        with open(result_file, "w", encoding="utf-8") as f:
-            f.write(f"{selected_folder}\n")
-    except Exception as e:
-        logger.error("写入结果文件失败 %s，错误：%s", result_file, e)
 
     return selected_path
 
@@ -410,6 +401,78 @@ def _step_apply_nonmodifiable_flags(tree_json_path: str, annotated_directory_pat
         return None
 
 
+def _step_visualize_tree(tree_json_path: str) -> Optional[str]:
+    """从 treenode.json 生成简单字符树结构并保存到 treevisualization.txt。"""
+    logger = logging.getLogger(__name__)
+
+    if not os.path.isfile(tree_json_path):
+        logger.error("treenode.json 文件不存在，无法生成 treevisualization.txt：%s", tree_json_path)
+        return None
+
+    try:
+        with open(tree_json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        logger.error("读取 treenode.json 失败 %s，错误：%s", tree_json_path, e)
+        return None
+
+    nodes = data.get("nodes", [])
+    if not isinstance(nodes, list):
+        logger.error("treenode.json 中的 nodes 不是列表: %s", type(nodes).__name__)
+        return None
+
+    def to_int_level(value):
+        try:
+            return int(str(value).strip())
+        except (TypeError, ValueError):
+            return 1
+
+    def has_later_sibling(start_index: int, level: int) -> bool:
+        for later in nodes[start_index + 1 :]:
+            later_level = to_int_level(later.get("层级"))
+            if later_level < level:
+                return False
+            if later_level == level:
+                return True
+        return False
+
+    visualization_lines = []
+    for index, node in enumerate(nodes):
+        level = to_int_level(node.get("层级"))
+        serial = str(node.get("序号", "")).strip()
+        title = str(node.get("题目", "")).strip()
+        flag = str(node.get("不可修改", "")).strip()
+        label = f"[{serial} {title} {flag}]".replace("  ", " ").strip()
+
+        if level <= 1:
+            visualization_lines.append(label)
+            continue
+
+        connector = "└── " if not has_later_sibling(index, level) else "├── "
+
+        prefix_parts = []
+        for ancestor_level in range(1, level):
+            if has_later_sibling(index, ancestor_level):
+                prefix_parts.append("│   ")
+            else:
+                prefix_parts.append("    ")
+
+        prefix = "".join(prefix_parts)
+        visualization_lines.append(f"{prefix}{connector}{label}")
+
+    output_dir = os.path.dirname(tree_json_path)
+    output_file = os.path.join(output_dir, "treevisualization.txt")
+
+    try:
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write("\n".join(visualization_lines))
+        logger.info("成功生成树结构可视化文件 %s", output_file)
+        return output_file
+    except Exception as e:
+        logger.error("保存 treevisualization.txt 失败 %s，错误：%s", output_file, e)
+        return None
+
+
 def collecttree(output_dir: str, work_dir: str):
     # 日志设置
     log_file = get_log_file_path(work_dir)
@@ -419,16 +482,22 @@ def collecttree(output_dir: str, work_dir: str):
     logger.info("管线开始，output_dir=%s work_dir=%s", output_dir, work_dir)
 
     # 执行各个处理步骤
-    # 寻找需要处理的文件
+    # 从 output_dir 中查找第一个 full.md，并返回其路径
     selected_path = _step_file_collection(output_dir, work_dir)
     if selected_path:
-        json_path = _step_generate_tree_nodes(selected_path, output_dir)
+        # 解析 selected_path，生成 treenode.json ：生成初步树节点
+        json_path = _step_generate_tree_nodes(selected_path,  output_dir)
         if json_path:
+            # 从 treenode.json 生成 treedirectory.txt ：提取树标题
             directory_path = _step_output_directory(json_path)
             if directory_path:
+                # 调用AI标注 treedirectory.txt，生成 treedirectorynew.txt ：调用大模型分析树不可修改字段
                 annotated_path = _step_annotate_directory_with_ai(directory_path)
                 if annotated_path:
+                    # 将 treedirectorynew.txt 的标记写回 treenode.json 中的不可修改字段 ：字段写回
                     _step_apply_nonmodifiable_flags(json_path, annotated_path)
+            # 生成树结构可视化文件
+            _step_visualize_tree(json_path)
     else:
         logger.warning("未找到可处理的 full.md 文件")
 

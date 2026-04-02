@@ -1,6 +1,5 @@
 from .logger import get_log_file_path, setup_logger, clean_old_logs
 from .ai_api_client import ai_chat, ai_chat_with_progress
-# 从 fileprocess 导出
 from .fileprocess import (
     select_file,
     get_token,
