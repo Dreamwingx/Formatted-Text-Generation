@@ -4,8 +4,8 @@ import os
 import re
 from typing import Optional, Dict, Tuple
 
-from ai_api_client import ai_chat_with_progress
-from logger import get_log_file_path, setup_logger
+from .ai_api_client import ai_chat_with_progress
+from .logger import get_log_file_path, setup_logger
 
 def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
     """在输出目录中搜索 ``full.md`` 文件。

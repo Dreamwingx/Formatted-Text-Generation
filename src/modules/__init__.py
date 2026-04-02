@@ -10,6 +10,8 @@ from .fileprocess import (
     extract_zip_to_dir,
     mineru,
 )
+from .preprocess import preprocess
+from .collecttree import collecttree
 
 __all__ = [
     # logger 接口
@@ -30,4 +32,10 @@ __all__ = [
     'download_url_to_file',
     'extract_zip_to_dir',
     'mineru',
+
+    # preprocess 接口
+    'preprocess',
+
+    # collecttree 接口
+    'collecttree',
 ]
