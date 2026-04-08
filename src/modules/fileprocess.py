@@ -10,6 +10,7 @@ import zipfile
 
 
 def select_file():
+    selection_failed = False
     try:
         from tkinter import Tk, filedialog
         root = Tk()
@@ -18,8 +19,19 @@ def select_file():
         root.destroy()
         if path:
             return path
+        selection_failed = True
     except Exception:
-        pass
+        selection_failed = True
+
+    if selection_failed:
+        while True:
+            choice = input("未选择文件，是否继续处理？输入1继续，输入0退出：").strip()
+            if choice == '1':
+                break
+            if choice == '0':
+                print("未选择文件，退出.")
+                sys.exit(1)
+            print("请输入 1 或 0。")
 
     path = input("请输入要上传的文件路径 (或拖入并回车): ").strip('" ')
     if not path:

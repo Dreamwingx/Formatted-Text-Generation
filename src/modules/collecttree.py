@@ -4,8 +4,14 @@ import os
 import re
 from typing import Optional, Dict, Tuple
 
-from .ai_api_client import ai_chat_with_progress
-from .logger import get_log_file_path, setup_logger
+if __name__ == "__main__":
+    # 直接运行时，使用绝对导入
+    from ai_api_client import ai_chat_with_progress
+    from logger import get_log_file_path, setup_logger
+else:
+    # 作为模块导入时，使用相对导入
+    from .ai_api_client import ai_chat_with_progress
+    from .logger import get_log_file_path, setup_logger
 
 def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
     """在输出目录中搜索 ``full.md`` 文件。
@@ -44,20 +50,21 @@ def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
 
     return selected_path
 
-def _extract_serial_and_title(title_line: str) -> Tuple[str, str, bool]:
-    """从标题行中提取序号、题目和规范格式标志。
+def _extract_serial_and_title(title_line: str) -> Tuple[str, str, bool, str]:
+    """从标题行中提取序号、题目、规范格式标志和类别。
     
     返回值:
-        (serial, title, is_standard):
+        (serial, title, is_standard, category):
         - serial: 序号字符串（例如 "1.2", "（1）", "(1)", "①" 等）
         - title: 题目名称（#后面的汉字部分）
         - is_standard: 是否为规范格式（点分十进制）
+        - category: 类别 ("standard", "bracket", "chinese_num", "other")
     """
     # 移除#符号并去除前导空格
     content = title_line.lstrip('#').strip()
     
     if not content:
-        return "", "", False
+        return "", "", False, "other"
     
     # 规范格式: 1, 1.1, 1.1.1 等（数字和点的组合）
     standard_match = re.match(r'^(\d+(?:\.\d+)*)\s+(.*?)$', content)
@@ -71,49 +78,68 @@ def _extract_serial_and_title(title_line: str) -> Tuple[str, str, bool]:
     # 中文数字标号: ①, ②, ③ 等
     chinese_num_match = re.match(r'^([①②③④⑤⑥⑦⑧⑨⑩]+)\s+(.*?)$', content)
     
+    # 右中文括号格式: 1）, 1.1） 等
+    right_cn_paren_match = re.match(r'^(\d+(?:\.\d+)*\）)\s+(.*?)$', content)
+    
+    # 右圆括号格式: 1), 1.1) 等
+    right_paren_match = re.match(r'^(\d+(?:\.\d+)*\))\s+(.*?)$', content)
+    
     # 按优先级匹配
     if standard_match:
         serial = standard_match.group(1)
         title = standard_match.group(2)
         is_standard = True
+        category = "standard"
     elif cn_bracket_match:
         serial = cn_bracket_match.group(1)
         title = cn_bracket_match.group(2)
         is_standard = False
+        category = "bracket"
     elif paren_match:
         serial = paren_match.group(1)
         title = paren_match.group(2)
         is_standard = False
+        category = "bracket"
+    elif right_cn_paren_match:
+        serial = right_cn_paren_match.group(1)
+        title = right_cn_paren_match.group(2)
+        is_standard = False
+        category = "right_bracket"
+    elif right_paren_match:
+        serial = right_paren_match.group(1)
+        title = right_paren_match.group(2)
+        is_standard = False
+        category = "right_bracket"
     elif chinese_num_match:
         serial = chinese_num_match.group(1)
         title = chinese_num_match.group(2)
         is_standard = False
+        category = "chinese_num"
     else:
         # 没有匹配到序号格式
         serial = ""
         title = content
         is_standard = False
+        category = "other"
     
-    return serial, title, is_standard
+    return serial, title, is_standard, category
 
-def _get_level(serial: str, is_standard: bool, last_standard_level: int, 
-               non_standard_map: Dict[str, int]) -> int:
-    """根据序号格式确定层级。
+def _get_level(category: str, last_level: int, non_standard_map: Dict[str, int]) -> int:
+    """根据类别确定层级。
     
-    规范格式的层级 = 点数 + 1
-    非规范格式在上一个规范层级到下一个规范层级之间，
-    每出现一种新格式就分配为 last_standard_level + 1
+    如果类别不在 non_standard_map 中，分配层级为上一层级 + 1。
+    如果在 map 中，分配为 map 中的层级，并清空 map 中更高层级的标记。
     """
-    if is_standard:
-        # 规范格式：层级 = 点数 + 1
-        level = serial.count('.') + 1
-        return level
+    if category not in non_standard_map:
+        level = last_level + 1
+        non_standard_map[category] = level
     else:
-        # 非规范格式
-        if serial not in non_standard_map:
-            # 新的非规范格式，分配为上一个规范层级 + 1
-            non_standard_map[serial] = last_standard_level + 1
-        return non_standard_map[serial]
+        level = non_standard_map[category]
+        # 清空更高层级的标记
+        to_remove = [k for k, v in non_standard_map.items() if v > level]
+        for k in to_remove:
+            del non_standard_map[k]
+    return level
 
 def _step_generate_tree_nodes(selected_path: str, output_dir: str) -> Optional[str]:
     """解析markdown文件并生成包含结构化节点的json文件。
@@ -137,7 +163,7 @@ def _step_generate_tree_nodes(selected_path: str, output_dir: str) -> Optional[s
     nodes = []
     current_block = None
     block_count = 0
-    last_standard_level = 0
+    last_level = 0
     non_standard_map: Dict[str, int] = {}
     
     # 逐行处理
@@ -154,15 +180,14 @@ def _step_generate_tree_nodes(selected_path: str, output_dir: str) -> Optional[s
                 nodes.append(current_block)
             
             # 提取序号和题目
-            serial, title, is_standard = _extract_serial_and_title(line)
+            serial, title, is_standard, category = _extract_serial_and_title(line)
             
             # 确定层级
             if is_standard:
                 level = serial.count('.') + 1
-                last_standard_level = level
                 non_standard_map.clear()
             else:
-                level = _get_level(serial, False, last_standard_level, non_standard_map)
+                level = _get_level(category, last_level, non_standard_map)
             
             # 创建新块
             block_count += 1
@@ -175,6 +200,7 @@ def _step_generate_tree_nodes(selected_path: str, output_dir: str) -> Optional[s
                 "正文字数": 0,
                 "不可修改": 0
             }
+            last_level = level
         else:
             # 添加内容到当前块的正文
             if current_block is not None:

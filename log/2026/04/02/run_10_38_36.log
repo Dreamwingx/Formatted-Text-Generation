@@ -1,0 +1,32 @@
+[2026-04-02 10:38:36] INFO [function.py:18 split_docx_pipline()] - 日志设置成功
+[2026-04-02 10:38:36] INFO [function.py:26 split_docx_pipline()] - 开始预处理管线
+[2026-04-02 10:38:36] INFO [preprocess.py:421 preprocess()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
+[2026-04-02 10:38:36] INFO [preprocess.py:42 _step_file_collection()] - 选择文件 D:\compile\Test\output\筑基计划项目申报书-hyx-20251127-night_extract\full.md 来自文件夹 筑基计划项目申报书-hyx-20251127-night_extract
+[2026-04-02 10:38:36] INFO [preprocess.py:110 _step_title_space_align()] - 未发现需要格式化的标题
+[2026-04-02 10:38:36] INFO [preprocess.py:270 _step_directory_extract()] - 未找到目录开始行
+[2026-04-02 10:38:36] INFO [preprocess.py:165 _step_bracket_format()] - 已格式化括号 1 个
+[2026-04-02 10:38:36] INFO [preprocess.py:356 _step_remove_trailing_noise()] - 已保存原始文末内容到 D:\compile\Test\output\筑基计划项目申报书-hyx-20251127-night_extract\tailing_noise.txt
+[2026-04-02 10:38:37] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+[2026-04-02 10:38:39] INFO [ai_api_client.py:195 ai_chat_with_progress()] - 【输入内容】
+下面是文档从最后一个标题开始到文末的完整内容。请根据以下指示进行处理：
+
+【输入开始】
+# 6 经济性分析
+
+（从推广和预测市场角度说明本项目前景。）
+【输入结束】
+
+【处理指示】
+1. 去除文末明显的噪声，例如：盖章页、附件页、与最后一级标题下正文格式/内容明显不符的页眉/页脚/申明/赘余附加页等。
+2. 保留属于最后一级标题下的实际正文内容，不要改动正文部分。
+3. 输出仅包含清理后的文本，不要附加任何解释、标记或多余说明。
+
+【输出要求】
+直接返回清理后的内容，格式与原文一致。
+[2026-04-02 10:38:39] INFO [ai_api_client.py:196 ai_chat_with_progress()] - # 6 经济性分析
+
+（从推广和预测市场角度说明本项目前景。）
+[2026-04-02 10:38:39] INFO [preprocess.py:392 _step_remove_trailing_noise()] - 已将清理后的文档内容写回原文件：D:\compile\Test\output\筑基计划项目申报书-hyx-20251127-night_extract\full.md
+[2026-04-02 10:38:39] INFO [preprocess.py:439 preprocess()] - 管线执行完成
+[2026-04-02 10:38:39] INFO [function.py:28 split_docx_pipline()] - 预处理完成
+[2026-04-02 10:38:39] INFO [function.py:31 split_docx_pipline()] - 开始树结构收集管线
