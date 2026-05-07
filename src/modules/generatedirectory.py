@@ -278,21 +278,19 @@ def rewrite_treenode(selected_path: str) -> Optional[str]:
     nodes_dict = {node['编号']: node for node in nodes if isinstance(node, dict) and '编号' in node}
 
     # 定义计算叶节点字数的函数
+    # 叶节点字数 = 当前节点向下所有层次的叶节点总字数
+    # 也就是说：父节点的叶节点字数 = 所有子节点的叶节点总字数之和
     def calculate_leaf_text_count(node_id, nodes_dict):
         node = nodes_dict[node_id]
         if node['子节点'] == 0:
-            # 叶节点
+            # 叶节点本身不统计为自身的“叶节点字数”
             return 0
         total = 0
         child_id = node['子节点']
         while child_id != 0:
             child = nodes_dict[child_id]
-            if child['子节点'] == 0:
-                # 叶节点，累加其正文字数
-                total += child['正文字数']
-            else:
-                # 非叶节点，递归累加
-                total += calculate_leaf_text_count(child_id, nodes_dict)
+            # 子节点的叶节点总字数 = 子节点的叶节点字数 + 子节点自身的正文字数
+            total += child['正文字数'] + calculate_leaf_text_count(child_id, nodes_dict)
             child_id = child['兄弟节点']
         return total
 

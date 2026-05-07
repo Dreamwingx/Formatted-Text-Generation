@@ -6,6 +6,7 @@ from typing import Optional, Dict, Tuple
 import threading
 import tkinter as tk
 from tkinter import scrolledtext
+import configparser
 
 if __name__ == "__main__":
     # 直接运行时，使用绝对导入
@@ -16,6 +17,192 @@ else:
     from .ai_api_client import ai_chat_with_progress
     from .logger import get_log_file_path, setup_logger
 
+def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
+    """在输出目录中搜索 ``full.md`` 文件。
+
+    - 遍历 ``output_dir`` 下的一级子目录。
+    - 找到每个子目录中是否存在名为 ``full.md`` 的文件。
+    - 如果找到多个，只处理第一个并记录警告。
+    - 处理意味着：
+        * 日志输出哪个子目录包含被选中的文件。
+        - 如果根本未找到任何 ``full.md``，记录一个警告。
+
+    返回值:
+        选中的 ``full.md`` 文件的绝对路径；如果未找到则返回 ``None``。
+    """
+
+    logger = logging.getLogger(__name__)
+
+    candidates = []  # 列表，包含 (文件夹名, 文件路径)
+    if os.path.isdir(output_dir):
+        for entry in sorted(os.listdir(output_dir)):
+            subdir = os.path.join(output_dir, entry)
+            if os.path.isdir(subdir):
+                candidate = os.path.join(subdir, "full.md")
+                if os.path.isfile(candidate):
+                    candidates.append((entry, candidate))
+
+    if not candidates:
+        logger.warning("未找到任何full.md文件")
+        return None
+
+    selected_folder, selected_path = candidates[0]
+    logger.info("选择文件 %s 来自文件夹 %s", selected_path, selected_folder)
+
+    if len(candidates) > 1:
+        logger.warning("存在复数文件，仅处理第一个")
+
+    return selected_path
+
+
+def _find_worknode(selected_path: str, work_dir: str):
+    """查找 work_dir 下的 config.ini，提取 max_generate_lenth，并分析树节点。"""
+    logger = logging.getLogger(__name__)
+
+    config_path = os.path.join(work_dir, 'config.ini')
+    config = configparser.ConfigParser()
+    config.read(config_path)
+    try:
+        max_generate_lenth = config.getint('settings', 'max_generate_lenth')
+    except (configparser.Error, TypeError, ValueError) as e:
+        logger.error("读取 config.ini 中 max_generate_lenth 失败: %s", e)
+        return
+
+    tree_path = os.path.join(os.path.dirname(selected_path), 'rewritedirectorytreenode.json')
+    if not os.path.isfile(tree_path):
+        logger.warning("未找到 rewritedirectorytreenode.json 在 %s", os.path.dirname(selected_path))
+        return
+
+    try:
+        with open(tree_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception as e:
+        logger.error("读取 rewritedirectorytreenode.json 失败: %s", e)
+        return
+
+    nodes = data.get('nodes') if isinstance(data, dict) else None
+    if not isinstance(nodes, list):
+        logger.warning("rewritedirectorytreenode.json 格式异常，缺少 nodes 列表")
+        return
+
+    nodes_dict = {node['编号']: node for node in nodes if isinstance(node, dict) and '编号' in node}
+    parent_by_id = {}
+
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_id = node.get('编号')
+        child_id = node.get('子节点', 0)
+        while child_id:
+            child = nodes_dict.get(child_id)
+            if child is None:
+                break
+            parent_by_id[child_id] = node_id
+            child_id = child.get('兄弟节点', 0)
+
+    def calculate_leaf_text_count(node_id):
+        node = nodes_dict[node_id]
+        if node.get('子节点', 0) == 0:
+            return 0
+        total = 0
+        child_id = node.get('子节点', 0)
+        while child_id:
+            child = nodes_dict.get(child_id)
+            if child is None:
+                break
+            total += child.get('正文字数', 0) + calculate_leaf_text_count(child_id)
+            child_id = child.get('兄弟节点', 0)
+        return total
+
+    for node in nodes:
+        if isinstance(node, dict) and '编号' in node:
+            node_id = node['编号']
+            node['叶节点字数'] = calculate_leaf_text_count(node_id)
+            node['叶节点总字数'] = node['叶节点字数'] + node.get('正文字数', 0)
+
+    skipped = set()
+    level_queues = {}
+
+    def mark_descendants(node_id):
+        child_id = nodes_dict[node_id].get('子节点', 0)
+        while child_id:
+            skipped.add(child_id)
+            mark_descendants(child_id)
+            sibling = nodes_dict.get(child_id, {}).get('兄弟节点', 0)
+            child_id = sibling
+
+    def traverse(node_id):
+        if node_id in skipped:
+            return
+        node = nodes_dict[node_id]
+        child_id = node.get('子节点', 0)
+        has_child = child_id != 0
+        parent_id = parent_by_id.get(node_id)
+        parent_ok = True if parent_id is None else nodes_dict[parent_id].get('叶节点字数', 0) > max_generate_lenth
+
+        qualifies = False
+        if not has_child:
+            qualifies = parent_ok
+        else:
+            qualifies = node.get('叶节点字数', 0) < max_generate_lenth and parent_ok
+
+        if qualifies:
+            depth_value = node.get('level', node.get('层级', 0))
+            try:
+                depth_int = int(depth_value)
+            except Exception:
+                depth_int = 0
+            entry = (
+                f"{node_id}\t{node.get('序号', '')}\t{node.get('题目', '')}\t{node.get('叶节点字数', 0)}\n"
+                f"层级：{depth_value}"
+            )
+            level_queues.setdefault(depth_int, []).append(entry)
+            mark_descendants(node_id)
+            return
+
+        while child_id:
+            child = nodes_dict.get(child_id)
+            if child is None:
+                break
+            traverse(child_id)
+            child_id = child.get('兄弟节点', 0)
+
+    root_ids = [node_id for node_id in nodes_dict if node_id not in parent_by_id]
+    for root_id in root_ids:
+        traverse(root_id)
+
+    temp_path = os.path.join(os.path.dirname(selected_path), 'temp.txt')
+    try:
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            for level in sorted(level_queues.keys(), reverse=True):
+                for entry in level_queues[level]:
+                    f.write(entry)
+                    f.write('\n')
+        logger.info("已将符合条件的节点按层级写入 %s", temp_path)
+    except Exception as e:
+        logger.error("写入 temp.txt 失败: %s", e)
+
+    return max_generate_lenth
+    
+
+   
+def generatetext(output_dir: str, work_dir: str):
+    # 日志设置
+    log_file = get_log_file_path(work_dir)
+    setup_logger(log_file, console=True)
+    logger = logging.getLogger(__name__)
+
+    logger.info("管线开始，output_dir=%s work_dir=%s", output_dir, work_dir)
+
+    # 执行各个处理步骤
+    # 从 output_dir 中查找第一个 full.md，并返回其路径
+    selected_path = _step_file_collection(output_dir, work_dir)
+    if selected_path:
+        # 解析 selected_path，生成 treenode.json ：生成初步树节点
+        _find_worknode(selected_path, work_dir)
+
+    else:
+        logger.warning("未找到可处理的 full.md 文件")
 
 if __name__ == "__main__":
     # 输入文件位置（当前未使用，可根据需要扩展）
