@@ -1,5 +1,0 @@
-[2026-04-02 09:57:32] INFO [collecttree.py:482 collecttree()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
-[2026-04-02 09:57:32] INFO [collecttree.py:40 _step_file_collection()] - 选择文件 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\full.md 来自文件夹 大模型课题一任务书-2025.09.03-【终稿】_extract
-[2026-04-02 09:57:32] WARNING [collecttree.py:43 _step_file_collection()] - 存在复数文件，仅处理第一个
-[2026-04-02 09:57:32] INFO [collecttree.py:241 _step_generate_tree_nodes()] - 成功处理文件，生成 194 个节点，保存到 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\treenode.json
-[2026-04-02 09:57:32] INFO [collecttree.py:276 _step_output_directory()] - 成功生成目录文件 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\treedirectory.txt

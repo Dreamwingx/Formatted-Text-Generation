@@ -1,0 +1,32 @@
+import json
+import logging
+import os
+import re 
+from typing import Optional, Dict, Tuple
+import threading
+import tkinter as tk
+from tkinter import scrolledtext
+
+if __name__ == "__main__":
+    # 直接运行时，使用绝对导入
+    from ai_api_client import ai_chat_with_progress
+    from logger import get_log_file_path, setup_logger
+else:
+    # 作为模块导入时，使用相对导入
+    from .ai_api_client import ai_chat_with_progress
+    from .logger import get_log_file_path, setup_logger
+
+
+if __name__ == "__main__":
+    # 输入文件位置（当前未使用，可根据需要扩展）
+    input_dir = r"D:\compile\Test\input"
+    # 输出文件位置
+    output_dir = r"D:\compile\Test\output"
+    # 代码保存位置
+    work_dir = r"D:\compile\Test"
+
+    # 确保目录存在
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(work_dir, exist_ok=True)
+
+    generatetext(output_dir, work_dir)

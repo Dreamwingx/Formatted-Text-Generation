@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-import re
+import re 
 from typing import Optional, Dict, Tuple
 
 if __name__ == "__main__":
@@ -58,7 +58,7 @@ def _extract_serial_and_title(title_line: str) -> Tuple[str, str, bool, str]:
         - serial: 序号字符串（例如 "1.2", "（1）", "(1)", "①" 等）
         - title: 题目名称（#后面的汉字部分）
         - is_standard: 是否为规范格式（点分十进制）
-        - category: 类别 ("standard", "bracket", "chinese_num", "other")
+        - category: 类别 ("standard", "bracket", "chinese_num", "other") 
     """
     # 移除#符号并去除前导空格
     content = title_line.lstrip('#').strip()

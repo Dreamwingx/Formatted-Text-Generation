@@ -1,0 +1,5 @@
+[2026-04-28 11:04:30] INFO [generatetext.py:212 generatetext()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
+[2026-04-28 11:04:30] INFO [generatetext.py:49 _step_file_collection()] - 选择文件 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\full.md 来自文件夹 大模型课题一任务书-2025.09.03-【终稿】_extract
+[2026-04-28 11:04:30] WARNING [generatetext.py:52 _step_file_collection()] - 存在复数文件，仅处理第一个
+[2026-04-28 11:04:40] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-04-28 11:04:49] INFO [generatetext.py:141 on_confirm()] - 已生成 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\rewritedirectory.txt

@@ -56,10 +56,10 @@ def get_config(task_type, model_name) -> dict:
     else:
         # 默认配置
         return {
-            "system_prompt": "你是一个智能文档助手。",
+            "system_prompt": "你是一个专业、友好、高效的 AI 助手，回答需简洁清晰。",
             "model": model_name,
-            "temperature": 0.7,
-            "max_tokens": 4096,
+            "temperature": 0.8,
+            "max_tokens": 8192,
             "stream": False
         }
 
