@@ -171,18 +171,184 @@ def _find_worknode(selected_path: str, work_dir: str):
     for root_id in root_ids:
         traverse(root_id)
 
+    return max_generate_lenth, level_queues, nodes_dict
+
+
+def _generate_leaf(level_queues: Dict[int, list], selected_path: str, nodes_dict: Dict) -> None:
+    """将按层级收集到的队列写入到 temp.txt 中。
+
+    按照之前的规则：从高层级到低层级逆序写入，每条条目后追加一个空行。
+    """
+    logger = logging.getLogger(__name__)
+
     temp_path = os.path.join(os.path.dirname(selected_path), 'temp.txt')
+    def resolve_key(key_str):
+        key_str = str(key_str).strip()
+        # try int first
+        try:
+            k = int(key_str)
+            if k in nodes_dict:
+                return k
+        except Exception:
+            pass
+        if key_str in nodes_dict:
+            return key_str
+        # fallback: try matching by stringified keys
+        for k in nodes_dict:
+            if str(k) == key_str:
+                return k
+        return None
+
     try:
         with open(temp_path, 'w', encoding='utf-8') as f:
             for level in sorted(level_queues.keys(), reverse=True):
                 for entry in level_queues[level]:
+                    # entry 格式以 编号\t 开头
+                    node_id_str = entry.split('\t', 1)[0]
+                    node_key = resolve_key(node_id_str)
+                    last_child = node_key
+                    if node_key is not None:
+                        node = nodes_dict.get(node_key, {})
+                        child_id = node.get('子节点', 0)
+                        if child_id:
+                            # 找到该子链中的最后一个（沿兄弟节点链走到尽头）
+                            cur = child_id
+                            while True:
+                                child = nodes_dict.get(cur)
+                                if not child:
+                                    break
+                                sibling = child.get('兄弟节点', 0)
+                                if not sibling:
+                                    break
+                                cur = sibling
+                            last_child = cur
+                        else:
+                            last_child = node_key
+                    else:
+                        last_child = ''
+
                     f.write(entry)
                     f.write('\n')
+                    f.write(f"最后子节点编号：{last_child}\n")
+                    f.write('\n')
+
+                    # 1) 从 node_key 开始收集子树内所有节点（按编号排序），提取 序号, 题目, 正文，构建原文 text_to_be_generated
+                    def collect_subtree(start_key):
+                        collected = []
+                        if start_key is None:
+                            return collected
+                        # BFS/DFS: traverse descendants via 子节点 and 兄弟节点
+                        stack = [start_key]
+                        while stack:
+                            nid = stack.pop()
+                            node = nodes_dict.get(nid)
+                            if not node:
+                                continue
+                            collected.append((nid, node))
+                            # push children of this node
+                            child = node.get('子节点', 0)
+                            if child:
+                                # collect the sibling chain starting from child
+                                cur = child
+                                while cur:
+                                    stack.append(cur)
+                                    child_node = nodes_dict.get(cur)
+                                    if not child_node:
+                                        break
+                                    cur = child_node.get('兄弟节点', 0)
+                        return collected
+
+                    subtree = collect_subtree(node_key)
+                    # 按编号排序（尝试按整数排序，否则按字符串）
+                    try:
+                        subtree_sorted = sorted(subtree, key=lambda x: int(x[0]))
+                    except Exception:
+                        subtree_sorted = sorted(subtree, key=lambda x: str(x[0]))
+
+                    parts = []
+                    for nid, nd in subtree_sorted:
+                        seq = nd.get('序号', '')
+                        title = nd.get('题目', '')
+                        body = nd.get('正文', '')
+                        parts.append(f"{seq}\n{title}\n{body}")
+
+                    text_to_be_generated = "\n\n".join(parts).strip()
+
+                    # 2) 调用大模型生成（若内容非空）
+                    if text_to_be_generated:
+                        prompt = (
+                            "一、基础规则\n"
+                            "1. 参考界定：提供的原文、参考文献仅作格式、排版、文风、句式参考，禁止复用原有专业内容、数据、案例。\n"
+                            "2. 固定主题：全文统一改写为：军事工艺推理模型总体框架设计与发展规划研究\n"
+                            "3. 格式字数：原版排版、层级结构、行文格式保持不变，字数与原文大致持平，不随意增减。\n"
+                            "二、仿写要求\n"
+                            "1. 目录适配：严格依照给定新目录撰写，下级内容贴合上级标题逻辑，适配军工工科任务书规范。\n"
+                            "2. 行文标准：文风严谨书面、客观专业，贴合军工科研表述；遵循工科写作逻辑，适配军事工艺、推理建模专业用词。\n"
+                            "三、硬性禁令\n"
+                            "1. 不得保留原文旧主题、旧数据、旧技术概念；\n"
+                            "2. 不得改动排版层级、段落结构；\n"
+                            "3. 不得添加无关冗余内容。\n"
+                            "四、输出要求\n"
+                            "我粘贴原文及目录后，仅输出合规仿写的任务书正文，无需额外解释、注释。\n\n"
+                            "【原文内容】\n"
+                            + text_to_be_generated
+                        )
+                        # try:
+                        #     result = ai_chat_with_progress(prompt, task_type="merging", log_to_console=False)
+                        # except Exception as e:
+                        #     logger.error("调用 ai_chat_with_progress 失败: %s", e)
+                        #     result = ''
+
+                        # 3) 将结果写回 rewritedirectorytreenode.json 中对应节点B的 '生成内容'
+                        try:
+                            tree_path = os.path.join(os.path.dirname(selected_path), 'rewritedirectorytreenode.json')
+                            if os.path.isfile(tree_path):
+                                with open(tree_path, 'r', encoding='utf-8') as jf:
+                                    tree_data = json.load(jf)
+                                nodes_list = tree_data.get('nodes') if isinstance(tree_data, dict) else None
+                                if isinstance(nodes_list, list):
+                                    # 将节点 B 的 '生成内容' 写入，并将子树所有节点的 '已生成' 标记为 1
+                                    mark_ids = {str(nid) for nid, _ in subtree_sorted}
+                                    for nd in nodes_list:
+                                        if not isinstance(nd, dict):
+                                            continue
+                                        if str(nd.get('编号')) in mark_ids:
+                                            nd['已生成'] = 1
+                                        if nd.get('编号') == node_key:
+                                            nd['生成内容'] = '+++已生成+++'
+                                    with open(tree_path, 'w', encoding='utf-8') as jf:
+                                        json.dump(tree_data, jf, ensure_ascii=False, indent=2)
+                        except Exception as e:
+                            logger.error("写回 rewritedirectorytreenode.json 失败: %s", e)
         logger.info("已将符合条件的节点按层级写入 %s", temp_path)
     except Exception as e:
         logger.error("写入 temp.txt 失败: %s", e)
 
-    return max_generate_lenth
+
+def initialize_generated_flags(selected_path: str) -> None:
+    """为 selected_path 同目录下的 rewritedirectorytreenode.json 中的每个节点添加字段 '已生成' 并置为 0。"""
+    logger = logging.getLogger(__name__)
+    tree_path = os.path.join(os.path.dirname(selected_path), 'rewritedirectorytreenode.json')
+    if not os.path.isfile(tree_path):
+        logger.warning("初始化已生成标记：未找到 %s", tree_path)
+        return
+    try:
+        with open(tree_path, 'r', encoding='utf-8') as jf:
+            tree_data = json.load(jf)
+        nodes_list = tree_data.get('nodes') if isinstance(tree_data, dict) else None
+        if isinstance(nodes_list, list):
+            changed = False
+            for nd in nodes_list:
+                if isinstance(nd, dict):
+                    if nd.get('已生成') != 0:
+                        nd['已生成'] = 0
+                        changed = True
+            if changed:
+                with open(tree_path, 'w', encoding='utf-8') as jf:
+                    json.dump(tree_data, jf, ensure_ascii=False, indent=2)
+                logger.info("已初始化所有节点的 '已生成' 标记为 0：%s", tree_path)
+    except Exception as e:
+        logger.error("初始化已生成标记失败: %s", e)
     
 
    
@@ -198,8 +364,15 @@ def generatetext(output_dir: str, work_dir: str):
     # 从 output_dir 中查找第一个 full.md，并返回其路径
     selected_path = _step_file_collection(output_dir, work_dir)
     if selected_path:
-        # 解析 selected_path，生成 treenode.json ：生成初步树节点
-        _find_worknode(selected_path, work_dir)
+        # 寻找work_dir下的config.ini，分析树节点，并根据规则筛选符合条件的节点，最终将结果写入到 selected_path 同目录下的 temp.txt
+        result = _find_worknode(selected_path, work_dir)
+        if result:
+            # unpack: max_generate_lenth, level_queues, nodes_dict
+            _, level_queues, nodes_dict = result
+            # 初始化所有节点的 "已生成" 位为 0
+            initialize_generated_flags(selected_path)
+            # 执行生成（测试模式：ai 调用被注释，写入测试标记）
+            _generate_leaf(level_queues, selected_path, nodes_dict)
 
     else:
         logger.warning("未找到可处理的 full.md 文件")
