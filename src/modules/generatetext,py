@@ -290,7 +290,7 @@ def _generate_leaf(level_queues: Dict[int, list], selected_path: str, nodes_dict
                             "3. 不得添加无关冗余内容。\n"
                             "四、输出要求\n"
                             "我粘贴原文及目录后，仅输出合规仿写的任务书正文，无需额外解释、注释。\n\n"
-                            "【原文内容】\n"
+                            "【原文内容】\n" 
                             + text_to_be_generated
                         )
                         # try:
@@ -349,7 +349,78 @@ def initialize_generated_flags(selected_path: str) -> None:
                 logger.info("已初始化所有节点的 '已生成' 标记为 0：%s", tree_path)
     except Exception as e:
         logger.error("初始化已生成标记失败: %s", e)
-    
+
+def process_pending_generation(selected_path: str) -> None:
+                logger = logging.getLogger(__name__)
+                tree_path = os.path.join(os.path.dirname(selected_path), 'rewritedirectorytreenode.json')
+                if not os.path.isfile(tree_path):
+                    logger.warning("process_pending_generation: 未找到 %s", tree_path)
+                    return
+                try:
+                    with open(tree_path, 'r', encoding='utf-8') as jf:
+                        tree_data = json.load(jf)
+                    nodes_list = tree_data.get('nodes') if isinstance(tree_data, dict) else None
+                    if not isinstance(nodes_list, list):
+                        logger.warning("process_pending_generation: nodes 列表不存在或格式异常")
+                        return
+
+                    level_queues_local = {}
+                    for nd in nodes_list:
+                        if not isinstance(nd, dict):
+                            continue
+                        if int(nd.get('已生成', 0)) == 0:
+                            depth_value = nd.get('level', nd.get('层级', 0))
+                            try:
+                                depth_int = int(depth_value)
+                            except Exception:
+                                depth_int = 0
+                            entry = f"{depth_int}\t{nd.get('编号')}\t{nd.get('序号','')}\t{nd.get('题目','')}"
+                            level_queues_local.setdefault(depth_int, []).append((nd.get('编号'), entry))
+
+                    temp_path = os.path.join(os.path.dirname(selected_path), 'temp.txt')
+                    # 将队列内容追加到 temp.txt 末尾（按层从深到浅输出）
+                    with open(temp_path, 'a', encoding='utf-8') as f:
+                        f.write('\n待生成队列（层数\t编号\t序号\t标题）：\n')
+                        for level in sorted(level_queues_local.keys(), reverse=True):
+                            for _, entry in level_queues_local[level]:
+                                f.write(entry + '\n')
+
+                    # 按层从下到上处理生成：深层先处理
+                    for level in sorted(level_queues_local.keys(), reverse=True):
+                        for nid, _ in level_queues_local[level]:
+                            # find node in nodes_list
+                            target = None
+                            for nd in nodes_list:
+                                if not isinstance(nd, dict):
+                                    continue
+                                if str(nd.get('编号')) == str(nid):
+                                    target = nd
+                                    break
+                            if target is None:
+                                continue
+                            try:
+                                zhengwen_count = int(target.get('正文字数', 0))
+                            except Exception:
+                                zhengwen_count = 0
+
+                            if zhengwen_count == 0:
+                                # 跳过生成，直接标记已生成
+                                target['已生成'] = 1
+                            else:
+                                # 预留 AI 调用点（测试不实际调用）
+                                # result = ai_chat_with_progress(prompt, task_type="merging", log_to_console=False)
+                                target['生成内容'] = '---已生成---'
+                                target['已生成'] = 1
+
+                        # 每处理完一层，写回 JSON
+                        try:
+                            with open(tree_path, 'w', encoding='utf-8') as jf:
+                                json.dump(tree_data, jf, ensure_ascii=False, indent=2)
+                        except Exception as e:
+                            logger.error("process_pending_generation 写回 JSON 失败: %s", e)
+
+                except Exception as e:
+                    logger.error("process_pending_generation 失败: %s", e)    
 
    
 def generatetext(output_dir: str, work_dir: str):
@@ -373,6 +444,9 @@ def generatetext(output_dir: str, work_dir: str):
             initialize_generated_flags(selected_path)
             # 执行生成（测试模式：ai 调用被注释，写入测试标记）
             _generate_leaf(level_queues, selected_path, nodes_dict)
+            # 收集并处理 remaining 未生成节点（按层队列，从下到上处理，写回 JSON）
+            
+            process_pending_generation(selected_path)
 
     else:
         logger.warning("未找到可处理的 full.md 文件")
