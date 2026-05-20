@@ -58,7 +58,7 @@ def get_config(task_type, model_name) -> dict:
         return {
             "system_prompt": "你是一个专业、友好、高效的 AI 助手，回答需简洁清晰。",
             "model": model_name,
-            "temperature": 0.8,
+            "temperature": 0.3,
             "max_tokens": 8192,
             "stream": False
         }

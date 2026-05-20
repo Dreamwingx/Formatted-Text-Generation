@@ -1,5 +1,5 @@
 {
-    "api_key": "sk-50e9e0ab1b1143c6b7878bcf0e4b7ea3",
-    "base_url": "https://api.deepseek.com",
-    "model_name": "deepseek-chat"
+    "api_key": "sk-tjxqkyegnodwmomgbsuhftmrisgudguwcauukgygaclsctou",
+    "base_url": "https://api.siliconflow.cn/v1",
+    "model_name": "Qwen/Qwen3.6-35B-A3B"
 }

@@ -293,11 +293,11 @@ def _generate_leaf(level_queues: Dict[int, list], selected_path: str, nodes_dict
                             "【原文内容】\n" 
                             + text_to_be_generated
                         )
-                        # try:
-                        #     result = ai_chat_with_progress(prompt, task_type="merging", log_to_console=False)
-                        # except Exception as e:
-                        #     logger.error("调用 ai_chat_with_progress 失败: %s", e)
-                        #     result = ''
+                        try:
+                            result = ai_chat_with_progress(prompt, task_type="merging", log_to_console=False)
+                        except Exception as e:
+                            logger.error("调用 ai_chat_with_progress 失败: %s", e)
+                            result = ''
 
                         # 3) 将结果写回 rewritedirectorytreenode.json 中对应节点B的 '生成内容'
                         try:
@@ -314,8 +314,8 @@ def _generate_leaf(level_queues: Dict[int, list], selected_path: str, nodes_dict
                                             continue
                                         if str(nd.get('编号')) in mark_ids:
                                             nd['已生成'] = 1
-                                        if nd.get('编号') == node_key:
-                                            nd['生成内容'] = '+++已生成+++'
+                                            if nd.get('编号') == node_key:
+                                                nd['生成内容'] = result
                                     with open(tree_path, 'w', encoding='utf-8') as jf:
                                         json.dump(tree_data, jf, ensure_ascii=False, indent=2)
                         except Exception as e:
@@ -350,79 +350,151 @@ def initialize_generated_flags(selected_path: str) -> None:
     except Exception as e:
         logger.error("初始化已生成标记失败: %s", e)
 
-def process_pending_generation(selected_path: str) -> None:
-                logger = logging.getLogger(__name__)
-                tree_path = os.path.join(os.path.dirname(selected_path), 'rewritedirectorytreenode.json')
-                if not os.path.isfile(tree_path):
-                    logger.warning("process_pending_generation: 未找到 %s", tree_path)
-                    return
+def _process_pending_generation(selected_path: str) -> None:
+    logger = logging.getLogger(__name__)
+    tree_path = os.path.join(os.path.dirname(selected_path), 'rewritedirectorytreenode.json')
+    if not os.path.isfile(tree_path):
+        logger.warning("process_pending_generation: 未找到 %s", tree_path)
+        return
+    try:
+        with open(tree_path, 'r', encoding='utf-8') as jf:
+            tree_data = json.load(jf)
+        nodes_list = tree_data.get('nodes') if isinstance(tree_data, dict) else None
+        if not isinstance(nodes_list, list):
+            logger.warning("process_pending_generation: nodes 列表不存在或格式异常")
+            return
+
+        level_queues_local = {}
+        for nd in nodes_list:
+            if not isinstance(nd, dict):
+                continue
+            if int(nd.get('已生成', 0)) == 0:
+                depth_value = nd.get('level', nd.get('层级', 0))
                 try:
-                    with open(tree_path, 'r', encoding='utf-8') as jf:
-                        tree_data = json.load(jf)
-                    nodes_list = tree_data.get('nodes') if isinstance(tree_data, dict) else None
-                    if not isinstance(nodes_list, list):
-                        logger.warning("process_pending_generation: nodes 列表不存在或格式异常")
-                        return
+                    depth_int = int(depth_value)
+                except Exception:
+                    depth_int = 0
+                entry = f"{depth_int}\t{nd.get('编号')}\t{nd.get('序号','')}\t{nd.get('题目','')}"
+                level_queues_local.setdefault(depth_int, []).append((nd.get('编号'), entry))
 
-                    level_queues_local = {}
-                    for nd in nodes_list:
-                        if not isinstance(nd, dict):
-                            continue
-                        if int(nd.get('已生成', 0)) == 0:
-                            depth_value = nd.get('level', nd.get('层级', 0))
-                            try:
-                                depth_int = int(depth_value)
-                            except Exception:
-                                depth_int = 0
-                            entry = f"{depth_int}\t{nd.get('编号')}\t{nd.get('序号','')}\t{nd.get('题目','')}"
-                            level_queues_local.setdefault(depth_int, []).append((nd.get('编号'), entry))
+        temp_path = os.path.join(os.path.dirname(selected_path), 'temp.txt')
+        # 将队列内容追加到 temp.txt 末尾（按层从深到浅输出）
+        with open(temp_path, 'a', encoding='utf-8') as f:
+            f.write('\n待生成队列（层数\t编号\t序号\t标题）：\n')
+            for level in sorted(level_queues_local.keys(), reverse=True):
+                for _, entry in level_queues_local[level]:
+                    f.write(entry + '\n')
 
-                    temp_path = os.path.join(os.path.dirname(selected_path), 'temp.txt')
-                    # 将队列内容追加到 temp.txt 末尾（按层从深到浅输出）
-                    with open(temp_path, 'a', encoding='utf-8') as f:
-                        f.write('\n待生成队列（层数\t编号\t序号\t标题）：\n')
-                        for level in sorted(level_queues_local.keys(), reverse=True):
-                            for _, entry in level_queues_local[level]:
-                                f.write(entry + '\n')
+        # 按层从下到上处理生成：深层先处理
+        for level in sorted(level_queues_local.keys(), reverse=True):
+            for nid, _ in level_queues_local[level]:
+                # find node in nodes_list
+                target = None
+                for nd in nodes_list:
+                    if not isinstance(nd, dict):
+                        continue
+                    if str(nd.get('编号')) == str(nid):
+                        target = nd
+                        break
+                if target is None:
+                    continue
+                try:
+                    zhengwen_count = int(target.get('正文字数', 0))
+                except Exception:
+                    zhengwen_count = 0
 
-                    # 按层从下到上处理生成：深层先处理
-                    for level in sorted(level_queues_local.keys(), reverse=True):
-                        for nid, _ in level_queues_local[level]:
-                            # find node in nodes_list
-                            target = None
-                            for nd in nodes_list:
-                                if not isinstance(nd, dict):
-                                    continue
-                                if str(nd.get('编号')) == str(nid):
-                                    target = nd
-                                    break
-                            if target is None:
-                                continue
-                            try:
-                                zhengwen_count = int(target.get('正文字数', 0))
-                            except Exception:
-                                zhengwen_count = 0
+                if zhengwen_count == 0:
+                    # 跳过生成，直接标记已生成
+                    target['已生成'] = 1
+                else:
+                    prompt = (
+                        "一、基础规则\n"
+                        "1. 参考界定：提供的原文、参考文献仅作格式、排版、文风、句式参考，禁止复用原有专业内容、数据、案例。\n"
+                        "2. 固定主题：全文统一改写为：军事工艺推理模型总体框架设计与发展规划研究\n"
+                        "3. 格式字数：原版排版、层级结构、行文格式保持不变，字数与原文大致持平，不随意增减。\n"
+                        "二、仿写要求\n"
+                        "1. 目录适配：严格依照给定新目录撰写，下级内容贴合上级标题逻辑，适配军工工科任务书规范。\n"
+                        "2. 行文标准：文风严谨书面、客观专业，贴合军工科研表述；遵循工科写作逻辑，适配军事工艺、推理建模专业用词。\n"
+                        "三、硬性禁令\n"
+                        "1. 不得保留原文旧主题、旧数据、旧技术概念；\n"
+                        "2. 不得改动排版层级、段落结构；\n"
+                        "3. 不得添加无关冗余内容。\n"
+                        "四、输出要求\n"
+                        "我粘贴原文及目录后，仅输出合规仿写的任务书正文，无需额外解释、注释。\n\n"
+                        "【原文内容】\n"
+                        + target.get('正文', '')
+                    )
+                    try:
+                        result = ai_chat_with_progress(prompt, task_type="merging", log_to_console=False)
+                    except Exception as e:
+                        logger.error("调用 ai_chat_with_progress 失败: %s", e)
+                        result = ''
+                    target['生成内容'] = result
+                    target['已生成'] = 1
 
-                            if zhengwen_count == 0:
-                                # 跳过生成，直接标记已生成
-                                target['已生成'] = 1
-                            else:
-                                # 预留 AI 调用点（测试不实际调用）
-                                # result = ai_chat_with_progress(prompt, task_type="merging", log_to_console=False)
-                                target['生成内容'] = '---已生成---'
-                                target['已生成'] = 1
+            # 每处理完一层，写回 JSON
+            try:
+                with open(tree_path, 'w', encoding='utf-8') as jf:
+                    json.dump(tree_data, jf, ensure_ascii=False, indent=2)
+            except Exception as e:
+                logger.error("process_pending_generation 写回 JSON 失败: %s", e)
 
-                        # 每处理完一层，写回 JSON
-                        try:
-                            with open(tree_path, 'w', encoding='utf-8') as jf:
-                                json.dump(tree_data, jf, ensure_ascii=False, indent=2)
-                        except Exception as e:
-                            logger.error("process_pending_generation 写回 JSON 失败: %s", e)
+    except Exception as e:
+        logger.error("process_pending_generation 失败: %s", e)
 
-                except Exception as e:
-                    logger.error("process_pending_generation 失败: %s", e)    
 
-   
+def _collect_text(selected_path: str) -> None:
+    """从 selected_path 同目录下的 rewritedirectorytreenode.json 提取所有生成内容并写入 rewrite.txt。"""
+    logger = logging.getLogger(__name__)
+    tree_path = os.path.join(os.path.dirname(selected_path), 'rewritedirectorytreenode.json')
+    if not os.path.isfile(tree_path):
+        logger.warning("_collect_text: 未找到 %s", tree_path)
+        return
+
+    try:
+        with open(tree_path, 'r', encoding='utf-8') as jf:
+            tree_data = json.load(jf)
+    except Exception as e:
+        logger.error("_collect_text 读取 rewritedirectorytreenode.json 失败: %s", e)
+        return
+
+    nodes_list = tree_data.get('nodes') if isinstance(tree_data, dict) else None
+    if not isinstance(nodes_list, list):
+        logger.warning("_collect_text: nodes 列表不存在或格式异常")
+        return
+
+    def sort_key(nd: dict):
+        nid = nd.get('编号')
+        if nid is None:
+            return ''
+        try:
+            return int(nid)
+        except Exception:
+            return str(nid)
+
+    sorted_nodes = sorted(
+        (nd for nd in nodes_list if isinstance(nd, dict) and '编号' in nd),
+        key=sort_key
+    )
+    contents = []
+    for nd in sorted_nodes:
+        generated = nd.get('生成内容')
+        if isinstance(generated, str) and generated.strip():
+            contents.append(generated)
+        else:
+            seq = nd.get('序号', '')
+            title = nd.get('题目', '')
+            contents.append(f"{seq}\n{title}")
+
+    rewrite_path = os.path.join(os.path.dirname(selected_path), 'rewrite.txt')
+    try:
+        with open(rewrite_path, 'w', encoding='utf-8') as rf:
+            rf.write('\n\n'.join(contents))
+        logger.info("已将生成内容保存到 %s", rewrite_path)
+    except Exception as e:
+        logger.error("_collect_text 写入 rewrite.txt 失败: %s", e)
+
+
 def generatetext(output_dir: str, work_dir: str):
     # 日志设置
     log_file = get_log_file_path(work_dir)
@@ -444,9 +516,10 @@ def generatetext(output_dir: str, work_dir: str):
             initialize_generated_flags(selected_path)
             # 执行生成（测试模式：ai 调用被注释，写入测试标记）
             _generate_leaf(level_queues, selected_path, nodes_dict)
-            # 收集并处理 remaining 未生成节点（按层队列，从下到上处理，写回 JSON）
-            
-            process_pending_generation(selected_path)
+            # 收集并处理剩余未生成节点，再次生成（按层队列，从下到上处理，写回 JSON）
+            _process_pending_generation(selected_path)
+            # 最后将所有节点的 "生成内容" 按编号顺序提取并写入 rewrite.txt
+            _collect_text(selected_path)
 
     else:
         logger.warning("未找到可处理的 full.md 文件")
