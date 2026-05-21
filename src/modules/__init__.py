@@ -12,6 +12,8 @@ from .fileprocess import (
 )
 from .preprocess import preprocess
 from .collecttree import collecttree
+from .generatedirectory import generatedirectory
+from .generatetext import generatetext
 
 __all__ = [
     # logger 接口
@@ -38,4 +40,10 @@ __all__ = [
 
     # collecttree 接口
     'collecttree',
+
+    # generatedirectory 接口
+    'generatedirectory',
+
+    # generatetext 接口
+    'generatetext',
 ]

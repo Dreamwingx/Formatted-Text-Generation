@@ -1,4 +1,0 @@
-[2026-05-08 15:28:56] INFO [generatetext,py:195 generatetext()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
-[2026-05-08 15:28:56] INFO [generatetext,py:50 _step_file_collection()] - 选择文件 D:\compile\Test\output\指南_extract\full.md 来自文件夹 指南_extract
-[2026-05-08 15:28:56] WARNING [generatetext,py:53 _step_file_collection()] - 存在复数文件，仅处理第一个
-[2026-05-08 15:28:56] WARNING [generatetext,py:73 _find_worknode()] - 未找到 rewritedirectorytreenode.json 在 D:\compile\Test\output\指南_extract

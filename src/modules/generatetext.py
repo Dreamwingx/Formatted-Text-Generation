@@ -368,6 +368,7 @@ def _process_pending_generation(selected_path: str) -> None:
         for nd in nodes_list:
             if not isinstance(nd, dict):
                 continue
+            nd['二次生成'] = 0
             if int(nd.get('已生成', 0)) == 0:
                 depth_value = nd.get('level', nd.get('层级', 0))
                 try:
@@ -377,13 +378,21 @@ def _process_pending_generation(selected_path: str) -> None:
                 entry = f"{depth_int}\t{nd.get('编号')}\t{nd.get('序号','')}\t{nd.get('题目','')}"
                 level_queues_local.setdefault(depth_int, []).append((nd.get('编号'), entry))
 
+        if not level_queues_local:
+            try:
+                with open(tree_path, 'w', encoding='utf-8') as jf:
+                    json.dump(tree_data, jf, ensure_ascii=False, indent=2)
+            except Exception as e:
+                logger.error("process_pending_generation 写回 JSON 失败: %s", e)
+            return
+
         temp_path = os.path.join(os.path.dirname(selected_path), 'temp.txt')
         # 将队列内容追加到 temp.txt 末尾（按层从深到浅输出）
         with open(temp_path, 'a', encoding='utf-8') as f:
             f.write('\n待生成队列（层数\t编号\t序号\t标题）：\n')
             for level in sorted(level_queues_local.keys(), reverse=True):
                 for _, entry in level_queues_local[level]:
-                    f.write(entry + '\n')
+                    f.write(entry + '\n') 
 
         # 按层从下到上处理生成：深层先处理
         for level in sorted(level_queues_local.keys(), reverse=True):
@@ -398,6 +407,7 @@ def _process_pending_generation(selected_path: str) -> None:
                         break
                 if target is None:
                     continue
+                target['二次生成'] = 1
                 try:
                     zhengwen_count = int(target.get('正文字数', 0))
                 except Exception:
@@ -481,7 +491,7 @@ def _collect_text(selected_path: str) -> None:
         generated = nd.get('生成内容')
         if isinstance(generated, str) and generated.strip():
             contents.append(generated)
-        else:
+        elif int(nd.get('二次生成', 0)) == 1:
             seq = nd.get('序号', '')
             title = nd.get('题目', '')
             contents.append(f"{seq}\n{title}")
@@ -525,7 +535,7 @@ def generatetext(output_dir: str, work_dir: str):
         logger.warning("未找到可处理的 full.md 文件")
 
 if __name__ == "__main__":
-    # 输入文件位置（当前未使用，可根据需要扩展）
+    # 输入文件位置
     input_dir = r"D:\compile\Test\input"
     # 输出文件位置
     output_dir = r"D:\compile\Test\output"
@@ -536,4 +546,4 @@ if __name__ == "__main__":
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(work_dir, exist_ok=True)
 
-    generatetext(output_dir, work_dir)
+    generatetext(output_dir, work_dir)  

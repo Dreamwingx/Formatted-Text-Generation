@@ -40,16 +40,11 @@ def get_config(task_type, model_name) -> dict:
             "max_tokens": 8192,
             "stream": False
         }
-    elif task_type == "translation":
+    elif task_type == "title":
         return {
-            "system_prompt": (
-                "你是一个专业的文档翻译专家。"
-                "请将用户提供的文档内容准确翻译成目标语言，"
-                "保持原文的专业术语和核心含义，同时确保翻译结果符合目标语言的表达习惯，"
-                "译文应流畅自然、语义准确、风格贴切。"
-            ),
+            "system_prompt": "你是一个专业、友好、高效的 AI 助手，回答需简洁清晰。",
             "model": model_name,
-            "temperature": 0.3,
+            "temperature": 0.7,
             "max_tokens": 8192,
             "stream": False
         }
