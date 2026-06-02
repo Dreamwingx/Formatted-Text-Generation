@@ -1,0 +1,4 @@
+[2026-05-27 10:18:22] INFO [search.py:27 search()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
+[2026-05-27 10:18:22] INFO [search.py:83 search()] - 未找到 jieba，使用简单分词（字/词边界）
+[2026-05-27 10:18:23] INFO [search.py:73 load_documents()] - 已加载文档块：0 条
+[2026-05-27 10:18:23] INFO [search.py:224 search()] - 索引构建完成：BM25 文档数=0 TFIDF=ok

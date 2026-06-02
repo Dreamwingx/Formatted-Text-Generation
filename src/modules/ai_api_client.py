@@ -201,6 +201,5 @@ def ai_chat_with_progress(user_input, task_type="default", log_to_console=True):
 
         return result
 
-
     finally:
         pbar.close()

@@ -1,0 +1,7 @@
+[2026-06-01 14:31:41] INFO [search.py:46 search()] - 管线开始，output_dir=d:\compile\Test\output work_dir=d:\compile\Test
+[2026-06-01 14:31:43] INFO [search.py:92 load_documents()] - 已加载文档块：200 条
+[2026-06-01 14:31:43] DEBUG [__init__.py:113 initialize()] - Building prefix dict from the default dictionary ...
+[2026-06-01 14:31:43] DEBUG [__init__.py:132 initialize()] - Loading model from cache C:\Users\DREAMW~1\AppData\Local\Temp\jieba.cache
+[2026-06-01 14:31:43] DEBUG [__init__.py:164 initialize()] - Loading model cost 0.897 seconds.
+[2026-06-01 14:31:43] DEBUG [__init__.py:166 initialize()] - Prefix dict has been built successfully.
+[2026-06-01 14:31:44] INFO [search.py:243 search()] - 索引构建完成：BM25 文档数=200 TFIDF=ok
