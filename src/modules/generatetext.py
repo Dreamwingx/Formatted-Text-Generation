@@ -1,3 +1,4 @@
+
 import json
 import logging
 import os
@@ -12,10 +13,40 @@ if __name__ == "__main__":
     # 直接运行时，使用绝对导入
     from ai_api_client import ai_chat_with_progress
     from logger import get_log_file_path, setup_logger
+    # 绝对导入 search.basequery（用于 RAG 检索）
+    try:
+        from search import basequery
+    except Exception:
+        # 如果无法导入，由调用处按需处理
+        basequery = None
 else:
     # 作为模块导入时，使用相对导入
     from .ai_api_client import ai_chat_with_progress
     from .logger import get_log_file_path, setup_logger
+    # 相对导入 search.basequery（用于 RAG 检索）
+    try:
+        from .search import basequery
+    except Exception:
+        try:
+            # 退回到包名导入
+            from src.modules.search import basequery
+        except Exception:
+            basequery = None
+
+def ask_theme() -> str:
+    """从控制台请求用户输入主题，若为空则返回默认主题。
+
+    注意：在 Windows 控制台上，输入/显示中文时可能遇到编码问题，
+    这里直接使用内置 input() 获取 Unicode 字符串；如果终端编码不支持，
+    用户可在环境中设置合适的编码或在调用前通过外部方式设置主题。
+    """
+    try:
+        theme = input("请输入本次生成的固定主题（回车使用默认）：").strip()
+    except Exception:
+        theme = ""
+    if not theme:
+        theme = "军事工艺推理模型总体框架设计与发展规划研究"
+    return theme
 
 def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
     """在输出目录中搜索 ``full.md`` 文件。
@@ -61,7 +92,27 @@ def _find_worknode(selected_path: str, work_dir: str):
 
     config_path = os.path.join(work_dir, 'config.ini')
     config = configparser.ConfigParser()
-    config.read(config_path)
+    # 尝试使用多种编码读取 config.ini，优先 utf-8，其次 utf-8-sig，随后回退到系统编码 gbk，再回退到 latin-1
+    encodings_to_try = ["utf-8", "utf-8-sig", "gbk", "latin-1"]
+    read_ok = False
+    for enc in encodings_to_try:
+        try:
+            with open(config_path, 'r', encoding=enc) as cf:
+                config.read_file(cf)
+            read_ok = True
+            break
+        except FileNotFoundError:
+            logger.error("未找到 config.ini：%s", config_path)
+            return
+        except Exception as e:
+            logger.debug("尝试以编码 %s 读取 config.ini 失败: %s", enc, e)
+            # 继续尝试下一个编码
+            continue
+
+    if not read_ok:
+        logger.error("无法以常见编码读取 config.ini：%s", config_path)
+        return
+
     try:
         max_generate_lenth = config.getint('settings', 'max_generate_lenth')
     except (configparser.Error, TypeError, ValueError) as e:
@@ -174,7 +225,7 @@ def _find_worknode(selected_path: str, work_dir: str):
     return max_generate_lenth, level_queues, nodes_dict
 
 
-def _generate_leaf(level_queues: Dict[int, list], selected_path: str, nodes_dict: Dict) -> None:
+def _generate_leaf(level_queues: Dict[int, list], selected_path: str, nodes_dict: Dict, new_theme: str) -> None:
     """将按层级收集到的队列写入到 temp.txt 中。
 
     按照之前的规则：从高层级到低层级逆序写入，每条条目后追加一个空行。
@@ -276,21 +327,37 @@ def _generate_leaf(level_queues: Dict[int, list], selected_path: str, nodes_dict
 
                     # 2) 调用大模型生成（若内容非空）
                     if text_to_be_generated:
+                        # 尝试使用 RAG（基于本地检索）补充参考资料
+                        rag_content = ''
+                        try:
+                            if basequery is not None:
+                                rag_results = basequery(3, new_theme, full_result=False)
+                                if isinstance(rag_results, list) and rag_results:
+                                    # 简单格式化每条参考为独立行，避免大段复制
+                                    rag_content = '\n'.join([f"- {r}" for r in rag_results if isinstance(r, str)])
+                        except Exception as e:
+                            logger.warning("RAG 检索失败：%s", e)
+
                         prompt = (
-                            "一、基础规则\n"
+                            f"一、基础规则\n"
                             "1. 参考界定：提供的原文、参考文献仅作格式、排版、文风、句式参考，禁止复用原有专业内容、数据、案例。\n"
-                            "2. 固定主题：全文统一改写为：军事工艺推理模型总体框架设计与发展规划研究\n"
+                            f"2. 固定主题：全文统一改写为：{new_theme}\n"
                             "3. 格式字数：原版排版、层级结构、行文格式保持不变，字数与原文大致持平，不随意增减。\n"
                             "二、仿写要求\n"
                             "1. 目录适配：严格依照给定新目录撰写，下级内容贴合上级标题逻辑，适配军工工科任务书规范。\n"
                             "2. 行文标准：文风严谨书面、客观专业，贴合军工科研表述；遵循工科写作逻辑，适配军事工艺、推理建模专业用词。\n"
-                            "三、硬性禁令\n"
+                            "三、RAG检索参考（插槽）\n"
+                            "【以下为检索到的相关参考资料，可用于知识补充与术语借鉴，但禁止直接复制长句或段落】\n"
+                            f"{rag_content}\n"
+                            "【RAG参考结束】\n"
+                            "四、硬性禁令\n"
                             "1. 不得保留原文旧主题、旧数据、旧技术概念；\n"
                             "2. 不得改动排版层级、段落结构；\n"
-                            "3. 不得添加无关冗余内容。\n"
-                            "四、输出要求\n"
+                            "3. 不得添加无关冗余内容；\n"
+                            "4. RAG内容仅作知识参考，不得大段照抄。\n"
+                            "五、输出要求\n"
                             "我粘贴原文及目录后，仅输出合规仿写的任务书正文，无需额外解释、注释。\n\n"
-                            "【原文内容】\n" 
+                            "【原文内容】\n"
                             + text_to_be_generated
                         )
                         try:
@@ -350,7 +417,7 @@ def initialize_generated_flags(selected_path: str) -> None:
     except Exception as e:
         logger.error("初始化已生成标记失败: %s", e)
 
-def _process_pending_generation(selected_path: str) -> None:
+def _process_pending_generation(selected_path: str, new_theme: str) -> None:
     logger = logging.getLogger(__name__)
     tree_path = os.path.join(os.path.dirname(selected_path), 'rewritedirectorytreenode.json')
     if not os.path.isfile(tree_path):
@@ -418,9 +485,9 @@ def _process_pending_generation(selected_path: str) -> None:
                     target['已生成'] = 1
                 else:
                     prompt = (
-                        "一、基础规则\n"
+                        f"一、基础规则\n"
                         "1. 参考界定：提供的原文、参考文献仅作格式、排版、文风、句式参考，禁止复用原有专业内容、数据、案例。\n"
-                        "2. 固定主题：全文统一改写为：军事工艺推理模型总体框架设计与发展规划研究\n"
+                        f"2. 固定主题：全文统一改写为：{new_theme}\n"
                         "3. 格式字数：原版排版、层级结构、行文格式保持不变，字数与原文大致持平，不随意增减。\n"
                         "二、仿写要求\n"
                         "1. 目录适配：严格依照给定新目录撰写，下级内容贴合上级标题逻辑，适配军工工科任务书规范。\n"
@@ -524,10 +591,12 @@ def generatetext(output_dir: str, work_dir: str):
             _, level_queues, nodes_dict = result
             # 初始化所有节点的 "已生成" 位为 0
             initialize_generated_flags(selected_path)
+            # 在生成前请求用户输入主题，并将其传递给生成函数
+            new_theme = ask_theme()
             # 执行生成（测试模式：ai 调用被注释，写入测试标记）
-            _generate_leaf(level_queues, selected_path, nodes_dict)
+            _generate_leaf(level_queues, selected_path, nodes_dict, new_theme)
             # 收集并处理剩余未生成节点，再次生成（按层队列，从下到上处理，写回 JSON）
-            _process_pending_generation(selected_path)
+            _process_pending_generation(selected_path, new_theme)
             # 最后将所有节点的 "生成内容" 按编号顺序提取并写入 rewrite.txt
             _collect_text(selected_path)
 

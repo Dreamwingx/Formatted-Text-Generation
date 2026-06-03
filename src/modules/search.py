@@ -9,6 +9,16 @@ from tkinter import scrolledtext
 import configparser
 import sys
 
+# Module-level cache to avoid rebuilding index on every call
+_search_lock = threading.Lock()
+_SEARCH_CACHE = None
+
+def clear_search_cache():
+    """Clear the module-level search index cache. Thread-safe."""
+    global _SEARCH_CACHE
+    with _search_lock:
+        _SEARCH_CACHE = None
+
 # 尝试在多种运行上下文中导入依赖（支持作为脚本运行、包导入或通过文件加载）
 try:
     # 优先相对导入（当作为包导入时）
@@ -103,6 +113,21 @@ def search(input_dir: str = None, output_dir: str = None, work_dir: str = None, 
 
         def tokenize(text: str):
             return re.findall(r"\w+|[\u4e00-\u9fff]", text)
+
+    # 检查模块级缓存，避免重复构建索引（线程安全）
+    global _SEARCH_CACHE
+    abs_input_dir = os.path.abspath(input_dir)
+    cache_hit = False
+    with _search_lock:
+        if _SEARCH_CACHE and _SEARCH_CACHE.get('input_dir') == abs_input_dir:
+            cache = _SEARCH_CACHE
+            docs = cache['docs']
+            docs_tokens = cache['docs_tokens']
+            bm25 = cache['bm25']
+            tfidf = cache['tfidf']
+            tokenize = cache['tokenize']
+            cache_hit = True
+            logger.info("使用缓存的索引：%s （%d 文档块）", abs_input_dir, len(docs))
 
     # ---- 第2步：BM25 检索器（纯 Python 实现） ----
     class BM25:
@@ -223,24 +248,37 @@ def search(input_dir: str = None, output_dir: str = None, work_dir: str = None, 
         np = None
         TFIDFRetriever = None
 
-    # ---- 构建索引 ----
-    docs = load_documents(input_dir)
-    texts = [d['content'] for d in docs]
-    docs_tokens = [tokenize(t) for t in texts]
+    # ---- 构建索引（仅在缓存未命中时执行） ----
+    if not cache_hit:
+        # 加载并分块文档
+        docs = load_documents(input_dir)
+        texts = [d['content'] for d in docs]
+        docs_tokens = [tokenize(t) for t in texts]
 
-    # BM25 索引
-    import math
-    bm25 = BM25(docs_tokens)
+        # BM25 索引
+        import math
+        bm25 = BM25(docs_tokens)
 
-    # TF-IDF 索引（如果可用）
-    tfidf = None
-    if 'TFIDFRetriever' in locals() and TFIDFRetriever is not None:
-        try:
-            tfidf = TFIDFRetriever(docs_tokens)
-        except Exception:
-            tfidf = None
+        # TF-IDF 索引（如果可用）
+        tfidf = None
+        if 'TFIDFRetriever' in locals() and TFIDFRetriever is not None:
+            try:
+                tfidf = TFIDFRetriever(docs_tokens)
+            except Exception:
+                tfidf = None
 
-    logger.info("索引构建完成：BM25 文档数=%d TFIDF=%s", len(docs_tokens), 'ok' if tfidf else 'no')
+        logger.info("索引构建完成：BM25 文档数=%d TFIDF=%s", len(docs_tokens), 'ok' if tfidf else 'no')
+
+        # 保存到模块级缓存，供后续调用复用
+        with _search_lock:
+            _SEARCH_CACHE = {
+                'input_dir': abs_input_dir,
+                'docs': docs,
+                'docs_tokens': docs_tokens,
+                'bm25': bm25,
+                'tfidf': tfidf,
+                'tokenize': tokenize,
+            }
 
     # ---- 混合检索接口 ----
     def hybrid_search(query: str, top_k=5, alpha=0.6, full_result: bool = True):
@@ -347,4 +385,4 @@ if __name__ == "__main__":
 
     # 运行默认的交互式搜索
     search(input_dir=input_dir, output_dir=output_dir, work_dir=work_dir, interactive=True, full_result = False)
-
+  

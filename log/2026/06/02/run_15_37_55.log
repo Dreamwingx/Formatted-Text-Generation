@@ -1,0 +1,3 @@
+[2026-06-02 15:37:55] INFO [search.py:46 search()] - 管线开始，output_dir=d:\compile\Test\output work_dir=d:\compile\Test
+[2026-06-02 15:37:55] INFO [search.py:92 load_documents()] - 已加载文档块：200 条
+[2026-06-02 15:37:56] INFO [search.py:243 search()] - 索引构建完成：BM25 文档数=200 TFIDF=ok

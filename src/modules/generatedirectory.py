@@ -1,11 +1,7 @@
 import json
 import logging
 import os
-import re 
-from typing import Optional, Dict, Tuple
-import threading
-import tkinter as tk
-from tkinter import scrolledtext
+from typing import Optional, Dict
 
 if __name__ == "__main__":
     # 直接运行时，使用绝对导入
@@ -55,14 +51,14 @@ def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
 
 
 def _rewrite_treedirectory(selected_path: str) -> Optional[str]:
-    """使用一个固定的提示词窗口（可编辑），并在下面放置“生成”按钮。
+    """根据控制台输入的主题，生成 rewritedirectory.txt 文件。
 
-    - 每次在提示词窗口点击“生成”，使用当前提示词调用 AI（线程中执行），
-      创建一个新的结果窗口显示生成内容（可编辑），并关闭之前的结果窗口。
-    - 在结果窗口点击“确定”后，将结果窗口中的文本保存到 rewritedirectory.txt，
-      然后关闭两个窗口并返回写入的文件路径。
+    - 用户在控制台中输入要替换后的主题。
+    - 将该主题插入提示词中的“请将主题替换为：”位置。
+    - 直接调用 AI 接口，生成的结果写入 rewritedirectory.txt。
+    - 不显示任何 GUI 窗口。
 
-    返回值：写入的文件路径或 None（出错或用户关闭窗口未保存）。
+    返回值：写入的 rewritedirectory.txt 的路径；如果失败则返回 None。
     """
 
     logger = logging.getLogger(__name__)
@@ -81,17 +77,22 @@ def _rewrite_treedirectory(selected_path: str) -> Optional[str]:
         logger.error("读取文件失败 %s: %s", src_file, e)
         return None
 
-    base_prompt = (
+    replacement_theme = input("请输入替换后的主题：").strip()
+    if not replacement_theme:
+        logger.warning("未输入替换主题，使用默认主题。")
+        replacement_theme = "军事工艺模型总体框架设计与发展规划研究"
+
+    prompt = (
         "我将给你一段文字，这是一篇任务书的目录部分。\n"
         "当前主题为：“大模型总体框架设计与发展规划研究”。\n"
-        "请将主题替换为：“军事工艺模型总体框架设计与发展规划研究”。\n"
+        f"请将主题替换为：“{replacement_theme}”。\n"
         "\n"
         "标题后面已经附有标记：\n"
         "- 后缀为 [0]：表示该标题允许根据新主题进行替换或调整表述。\n"
         "- 后缀为 [1]：表示该标题必须原样保留，不得修改。\n"
         "\n"
         "请你逐行处理目录中的每个标题，规则如下：\n"
-        "1. 对于后缀为 [0] 的标题：根据新主题（军事工艺模型总体框架设计与发展规划研究）进行适当替换或调整，使标题与新主题逻辑一致。\n"
+        "1. 对于后缀为 [0] 的标题：根据新主题进行适当替换或调整，使标题与新主题逻辑一致。\n"
         "2. 对于后缀为 [1] 的标题：必须原样保留，一个字也不改。\n"
         "3. 保持原有的层级结构、缩进或编号格式不变。\n"
         "4. 只输出修改后的目录文本，不要添加任何解释、说明、额外符号或注释。\n"
@@ -100,107 +101,26 @@ def _rewrite_treedirectory(selected_path: str) -> Optional[str]:
         + directory_text
     )
 
-    # GUI state container
-    result_state = {"window": None, "text_widget": None}
-
-    # 根窗口（提示词窗口）
-    root = tk.Tk()
-    root.title("提示词编辑窗口")
-
-    lbl = tk.Label(root, text="提示词（可编辑）：")
-    lbl.pack(anchor="w", padx=6, pady=(6, 0))
-
-    prompt_txt = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=100, height=20)
-    prompt_txt.pack(expand=True, fill=tk.BOTH, padx=6, pady=6)
-    prompt_txt.insert("1.0", base_prompt)
-
-    status_var = tk.StringVar(value="")
-
-    def create_result_window(text: str):
-        # 关闭旧的结果窗口（如果存在）
-        old = result_state.get("window")
-        try:
-            if old is not None and old.winfo_exists():
-                old.destroy()
-        except Exception:
-            pass
-
-        rw = tk.Toplevel(root)
-        rw.title("生成结果")
-
-        txt = scrolledtext.ScrolledText(rw, wrap=tk.WORD, width=100, height=30)
-        txt.pack(expand=True, fill=tk.BOTH, padx=6, pady=6)
-        txt.insert("1.0", text)
-
-        def on_confirm():
-            final_text = txt.get("1.0", tk.END).rstrip()
-            out_file = os.path.join(dirpath, "rewritedirectory.txt")
-            try:
-                with open(out_file, "w", encoding="utf-8") as f:
-                    f.write(final_text)
-                logger.info("已生成 %s", out_file)
-            except Exception as e:
-                logger.error("写入文件失败 %s: %s", out_file, e)
-            # 关闭结果窗口和提示窗口
-            try:
-                rw.destroy()
-            except Exception:
-                pass
-            try:
-                root.destroy()
-            except Exception:
-                pass
-
-        btn_confirm = tk.Button(rw, text="确定", command=on_confirm)
-        btn_confirm.pack(side=tk.BOTTOM, pady=6)
-
-        result_state["window"] = rw
-        result_state["text_widget"] = txt
-
-    def on_generate():
-        prompt_value = prompt_txt.get("1.0", tk.END).strip()
-        gen_btn.config(state=tk.DISABLED)
-        status_var.set("生成中...")
-
-        def worker():
-            try:
-                ai_result = ai_chat_with_progress(prompt_value, log_to_console=False)
-                if isinstance(ai_result, (dict, list)):
-                    text = json.dumps(ai_result, ensure_ascii=False, indent=2)
-                else:
-                    text = str(ai_result)
-            except Exception as e:
-                text = f"调用AI接口失败：{e}"
-
-            def done():
-                status_var.set("生成完成")
-                gen_btn.config(state=tk.NORMAL)
-                create_result_window(text)
-
-            root.after(0, done)
-
-        th = threading.Thread(target=worker, daemon=True)
-        th.start()
-
-    btn_frame = tk.Frame(root)
-    btn_frame.pack(fill=tk.X, padx=6, pady=(0, 6))
-
-    gen_btn = tk.Button(btn_frame, text="生成", command=on_generate)
-    gen_btn.pack(side=tk.LEFT)
-
-    status_lbl = tk.Label(btn_frame, textvariable=status_var)
-    status_lbl.pack(side=tk.LEFT, padx=8)
-
-    # 进入事件循环，直到窗口被关闭（例如点击结果窗口的 确定）
     try:
-        root.mainloop()
-    except Exception:
-        pass
+        ai_result = ai_chat_with_progress(prompt, log_to_console=False)
+        if isinstance(ai_result, (dict, list)):
+            text = json.dumps(ai_result, ensure_ascii=False, indent=2)
+        else:
+            text = str(ai_result)
+    except Exception as e:
+        logger.error("调用AI接口失败：%s", e)
+        return None
 
     out_file = os.path.join(dirpath, "rewritedirectory.txt")
-    if os.path.isfile(out_file):
-        return out_file
-    return None
+    try:
+        with open(out_file, "w", encoding="utf-8") as f:
+            f.write(text)
+        logger.info("已生成 %s", out_file)
+    except Exception as e:
+        logger.error("写入文件失败 %s: %s", out_file, e)
+        return None
+
+    return out_file
 
 
 def rewrite_treenode(selected_path: str) -> Optional[str]:

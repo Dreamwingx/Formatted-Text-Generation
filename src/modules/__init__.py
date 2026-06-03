@@ -14,6 +14,7 @@ from .preprocess import preprocess
 from .collecttree import collecttree
 from .generatedirectory import generatedirectory
 from .generatetext import generatetext
+from .polishtext import polishtext
 
 __all__ = [
     # logger 接口
@@ -46,4 +47,6 @@ __all__ = [
 
     # generatetext 接口
     'generatetext',
+    # polishtext 接口（润色）
+    'polishtext',
 ]

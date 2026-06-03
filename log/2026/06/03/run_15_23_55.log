@@ -1,0 +1,2 @@
+[2026-06-03 15:23:55] INFO [search.py:56 search()] - 管线开始，output_dir=d:\compile\Test\output work_dir=d:\compile\Test
+[2026-06-03 15:23:55] INFO [search.py:130 search()] - 使用缓存的索引：d:\compile\Test\input （200 文档块）
