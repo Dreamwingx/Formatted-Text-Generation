@@ -18,9 +18,9 @@ def split_docx_pipline(input_dir, output_dir, work_dir, days_to_keep):
     logging.info("日志设置成功")
 
     # 调用 fileprocess 的函数
-    logging.info("选择模板文件")
-    mineru(output_dir)
-    logging.info("文件处理成功")
+    # logging.info("选择模板文件")
+    # mineru(output_dir)
+    # logging.info("文件处理成功")
 
     # 调用 preprocess 管线，目前只处理第一个文件夹中的full.md
     logging.info("开始预处理管线")

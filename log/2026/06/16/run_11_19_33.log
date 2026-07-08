@@ -1,0 +1,14 @@
+[2026-06-16 11:19:33] INFO [function.py:18 split_docx_pipline()] - 日志设置成功
+[2026-06-16 11:19:33] INFO [function.py:26 split_docx_pipline()] - 开始预处理管线
+[2026-06-16 11:19:33] INFO [preprocess.py:421 preprocess()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
+[2026-06-16 11:19:33] INFO [preprocess.py:42 _step_file_collection()] - 选择文件 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\full.md 来自文件夹 大模型课题一任务书-2025.09.03-【终稿】_extract
+[2026-06-16 11:19:33] WARNING [preprocess.py:45 _step_file_collection()] - 存在复数文件，仅处理第一个
+[2026-06-16 11:19:33] INFO [preprocess.py:110 _step_title_space_align()] - 未发现需要格式化的标题
+[2026-06-16 11:19:33] INFO [preprocess.py:270 _step_directory_extract()] - 未找到目录开始行
+[2026-06-16 11:19:33] INFO [preprocess.py:169 _step_bracket_format()] - 未发现需要格式化的括号
+[2026-06-16 11:19:33] INFO [preprocess.py:356 _step_remove_trailing_noise()] - 已保存原始文末内容到 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\tailing_noise.txt
+[2026-06-16 11:19:39] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 11:19:39] ERROR [preprocess.py:379 _step_remove_trailing_noise()] - 调用AI接口失败，无法执行后噪声去除：Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 11:19:39] INFO [preprocess.py:439 preprocess()] - 管线执行完成
+[2026-06-16 11:19:39] INFO [function.py:28 split_docx_pipline()] - 预处理完成
+[2026-06-16 11:19:39] INFO [function.py:31 split_docx_pipline()] - 开始树结构收集管线

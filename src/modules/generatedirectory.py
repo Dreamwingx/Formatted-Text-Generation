@@ -1,3 +1,4 @@
+import configparser
 import json
 import logging
 import os
@@ -50,7 +51,67 @@ def _step_file_collection(output_dir: str, work_dir: str) -> Optional[str]:
     return selected_path
 
 
-def _rewrite_treedirectory(selected_path: str) -> Optional[str]:
+def _get_directory_chunk_limit(work_dir: str) -> int:
+    """从 config.ini 中读取目录重写分段最大字数。"""
+
+    logger = logging.getLogger(__name__)
+    config_path = os.path.join(work_dir, "config.ini")
+    default_limit = 5000
+
+    try:
+        if not os.path.isfile(config_path):
+            logger.warning("未找到 config.ini，使用默认目录重写分段长度 %d", default_limit)
+            return default_limit
+
+        config = configparser.ConfigParser()
+        config.read(config_path, encoding="utf-8")
+        if config.has_option("settings", "directory_rewrite_length"):
+            limit = config.getint("settings", "directory_rewrite_length")
+            if limit > 0:
+                logger.info("从 config.ini 读取目录重写分段长度：%d", limit)
+                return limit
+
+        logger.warning("配置项 directory_rewrite_length 无效，使用默认目录重写分段长度 %d", default_limit)
+    except Exception as e:
+        logger.warning("读取目录重写分段长度失败: %s，使用默认值 %d", e, default_limit)
+
+    return default_limit
+
+
+def _split_text_by_length(text: str, max_length: int) -> list:
+    """按字符数将文本切分为多个块，尽量保持行边界。"""
+
+    if max_length <= 0 or len(text) <= max_length:
+        return [text]
+
+    lines = text.splitlines()
+    chunks = []
+    current_lines = []
+    current_len = 0
+
+    for line in lines:
+        line_text = line.rstrip("\n")
+        line_len = len(line_text)
+        if not current_lines:
+            current_lines = [line_text]
+            current_len = line_len
+            continue
+
+        if current_len + 1 + line_len <= max_length:
+            current_lines.append(line_text)
+            current_len += 1 + line_len
+        else:
+            chunks.append("\n".join(current_lines))
+            current_lines = [line_text]
+            current_len = line_len
+
+    if current_lines:
+        chunks.append("\n".join(current_lines))
+
+    return chunks
+
+
+def _rewrite_treedirectory(selected_path: str, work_dir: str) -> Optional[str]:
     """根据控制台输入的主题，生成 rewritedirectory.txt 文件。
 
     - 用户在控制台中输入要替换后的主题。
@@ -82,39 +143,52 @@ def _rewrite_treedirectory(selected_path: str) -> Optional[str]:
         logger.warning("未输入替换主题，使用默认主题。")
         replacement_theme = "军事工艺模型总体框架设计与发展规划研究"
 
-    prompt = (
-        "我将给你一段文字，这是一篇任务书的目录部分。\n"
-        "当前主题为：“大模型总体框架设计与发展规划研究”。\n"
-        f"请将主题替换为：“{replacement_theme}”。\n"
-        "\n"
-        "标题后面已经附有标记：\n"
-        "- 后缀为 [0]：表示该标题允许根据新主题进行替换或调整表述。\n"
-        "- 后缀为 [1]：表示该标题必须原样保留，不得修改。\n"
-        "\n"
-        "请你逐行处理目录中的每个标题，规则如下：\n"
-        "1. 对于后缀为 [0] 的标题：根据新主题进行适当替换或调整，使标题与新主题逻辑一致。\n"
-        "2. 对于后缀为 [1] 的标题：必须原样保留，一个字也不改。\n"
-        "3. 保持原有的层级结构、缩进或编号格式不变。\n"
-        "4. 只输出修改后的目录文本，不要添加任何解释、说明、额外符号或注释。\n"
-        "\n"
-        "现在，输入你要处理的任务书目录：\n"
-        + directory_text
-    )
+    chunk_limit = _get_directory_chunk_limit(work_dir)
+    chunks = _split_text_by_length(directory_text, chunk_limit)
+    logger.info("目录文本将按最大 %d 字切分为 %d 段进行重写", chunk_limit, len(chunks))
 
-    try:
-        ai_result = ai_chat_with_progress(prompt, log_to_console=False)
-        if isinstance(ai_result, (dict, list)):
-            text = json.dumps(ai_result, ensure_ascii=False, indent=2)
-        else:
-            text = str(ai_result)
-    except Exception as e:
-        logger.error("调用AI接口失败：%s", e)
+    rewritten_chunks = []
+    for index, chunk in enumerate(chunks, start=1):
+        prompt = (
+            "我将给你一段文字，这是一篇任务书的目录部分。\n"
+            "当前主题为：“大模型总体框架设计与发展规划研究”。\n"
+            f"请将主题替换为：“{replacement_theme}”。\n"
+            "\n"
+            "标题后面已经附有标记：\n"
+            "- 后缀为 [0]：表示该标题允许根据新主题进行替换或调整表述。\n"
+            "- 后缀为 [1]：表示该标题必须原样保留，不得修改。\n"
+            "\n"
+            "请你逐行处理目录中的每个标题，规则如下：\n"
+            "1. 对于后缀为 [0] 的标题：根据新主题进行适当替换或调整，使标题与新主题逻辑一致。\n"
+            "2. 对于后缀为 [1] 的标题：必须原样保留，一个字也不改。\n"
+            "3. 保持原有的层级结构、缩进或编号格式不变。\n"
+            "4. 只输出修改后的目录文本，不要添加任何解释、说明、额外符号或注释。\n"
+            f"\n请处理第 {index}/{len(chunks)} 段目录文本：\n"
+            + chunk
+        )
+
+        try:
+            logger.info("正在处理目录第 %d/%d 段", index, len(chunks))
+            ai_result = ai_chat_with_progress(prompt, log_to_console=False)
+            if isinstance(ai_result, (dict, list)):
+                text = json.dumps(ai_result, ensure_ascii=False, indent=2)
+            else:
+                text = str(ai_result)
+        except Exception as e:
+            logger.error("调用AI接口失败（第 %d/%d 段）：%s", index, len(chunks), e)
+            return None
+
+        rewritten_chunks.append(text.strip())
+
+    full_text = "\n".join(chunk for chunk in rewritten_chunks if chunk)
+    if not full_text:
+        logger.warning("目录重写结果为空")
         return None
 
     out_file = os.path.join(dirpath, "rewritedirectory.txt")
     try:
         with open(out_file, "w", encoding="utf-8") as f:
-            f.write(text)
+            f.write(full_text)
         logger.info("已生成 %s", out_file)
     except Exception as e:
         logger.error("写入文件失败 %s: %s", out_file, e)
@@ -265,7 +339,7 @@ def generatedirectory(output_dir: str, work_dir: str):
     selected_path = _step_file_collection(output_dir, work_dir)
     if selected_path:
         # 解析 selected_path，生成 treenode.json ：生成初步树节点
-        _rewrite_treedirectory(selected_path)
+        _rewrite_treedirectory(selected_path, work_dir)
         # 在目录重写后，根据 rewritedirectory.txt 更新 treenode，生成 treenodenew.json
         try:
             rewrite_treenode(selected_path)

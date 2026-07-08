@@ -1,0 +1,26 @@
+[2026-06-16 15:55:41] INFO [search.py:56 search()] - 管线开始，output_dir=d:\compile\Test\output work_dir=d:\compile\Test
+[2026-06-16 15:55:41] INFO [search.py:130 search()] - 使用缓存的索引：d:\compile\Test\input （200 文档块）
+[2026-06-16 15:55:42] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:55:42] ERROR [generatetext.py:372 _generate_leaf()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 15:55:42] INFO [generatetext.py:396 _generate_leaf()] - 已将符合条件的节点按层级写入 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\temp.txt
+[2026-06-16 15:55:42] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:55:42] ERROR [generatetext.py:513 _process_pending_generation()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 15:55:43] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:55:43] ERROR [generatetext.py:513 _process_pending_generation()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 15:55:44] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:55:44] ERROR [generatetext.py:513 _process_pending_generation()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 15:55:45] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:55:45] ERROR [generatetext.py:513 _process_pending_generation()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 15:55:46] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:55:46] ERROR [generatetext.py:513 _process_pending_generation()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 15:55:47] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:55:47] ERROR [generatetext.py:513 _process_pending_generation()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 15:55:48] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:55:48] ERROR [generatetext.py:513 _process_pending_generation()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 15:55:49] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:55:49] ERROR [generatetext.py:513 _process_pending_generation()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 15:55:49] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:55:49] ERROR [generatetext.py:513 _process_pending_generation()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 15:55:49] INFO [generatetext.py:576 _collect_text()] - 已将生成内容保存到 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\rewrite.txt
+[2026-06-16 15:55:49] INFO [function.py:38 split_docx_pipline()] - 生成目录完成
+[2026-06-16 15:55:49] INFO [function.py:41 split_docx_pipline()] - 开始文本生成管线

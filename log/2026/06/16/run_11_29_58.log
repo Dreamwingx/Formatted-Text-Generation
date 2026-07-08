@@ -1,0 +1,10 @@
+[2026-06-16 11:29:58] INFO [collecttree.py:508 collecttree()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
+[2026-06-16 11:29:58] INFO [collecttree.py:46 _step_file_collection()] - 选择文件 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\full.md 来自文件夹 大模型课题一任务书-2025.09.03-【终稿】_extract
+[2026-06-16 11:29:58] WARNING [collecttree.py:49 _step_file_collection()] - 存在复数文件，仅处理第一个
+[2026-06-16 11:29:58] INFO [collecttree.py:267 _step_generate_tree_nodes()] - 成功处理文件，生成 194 个节点，保存到 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\treenode.json
+[2026-06-16 11:29:58] INFO [collecttree.py:302 _step_output_directory()] - 成功生成目录文件 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\treedirectory.txt
+[2026-06-16 11:29:59] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 11:29:59] ERROR [collecttree.py:343 _step_annotate_directory_with_ai()] - 调用AI接口失败，无法生成 treedirectorynew.txt：Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 11:29:59] INFO [collecttree.py:495 _step_visualize_tree()] - 成功生成树结构可视化文件 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\treevisualization.txt
+[2026-06-16 11:29:59] INFO [function.py:33 split_docx_pipline()] - 树结构收集完成
+[2026-06-16 11:29:59] INFO [function.py:36 split_docx_pipline()] - 开始生成目录管线

@@ -1,0 +1,4 @@
+[2026-06-16 15:54:41] INFO [search.py:56 search()] - 管线开始，output_dir=d:\compile\Test\output work_dir=d:\compile\Test
+[2026-06-16 15:54:41] INFO [search.py:130 search()] - 使用缓存的索引：d:\compile\Test\input （200 文档块）
+[2026-06-16 15:54:42] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 15:54:42] ERROR [generatetext.py:372 _generate_leaf()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}

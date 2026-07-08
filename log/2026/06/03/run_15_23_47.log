@@ -1,9 +1,0 @@
-[2026-06-03 15:23:47] INFO [search.py:56 search()] - 管线开始，output_dir=d:\compile\Test\output work_dir=d:\compile\Test
-[2026-06-03 15:23:48] INFO [search.py:102 load_documents()] - 已加载文档块：200 条
-[2026-06-03 15:23:48] DEBUG [__init__.py:113 initialize()] - Building prefix dict from the default dictionary ...
-[2026-06-03 15:23:49] DEBUG [__init__.py:146 initialize()] - Dumping model to file cache C:\Users\DREAMW~1\AppData\Local\Temp\jieba.cache
-[2026-06-03 15:23:49] DEBUG [__init__.py:164 initialize()] - Loading model cost 0.944 seconds.
-[2026-06-03 15:23:49] DEBUG [__init__.py:166 initialize()] - Prefix dict has been built successfully.
-[2026-06-03 15:23:49] INFO [search.py:270 search()] - 索引构建完成：BM25 文档数=200 TFIDF=ok
-[2026-06-03 15:23:51] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
-[2026-06-03 15:23:51] ERROR [generatetext.py:366 _generate_leaf()] - 调用 ai_chat_with_progress 失败: Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}

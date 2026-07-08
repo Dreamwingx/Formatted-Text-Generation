@@ -1,0 +1,8 @@
+[2026-06-16 11:29:59] INFO [generatedirectory.py:305 generatedirectory()] - 管线开始，output_dir=D:\compile\Test\output work_dir=D:\compile\Test
+[2026-06-16 11:29:59] INFO [generatedirectory.py:46 _step_file_collection()] - 选择文件 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\full.md 来自文件夹 大模型课题一任务书-2025.09.03-【终稿】_extract
+[2026-06-16 11:29:59] WARNING [generatedirectory.py:49 _step_file_collection()] - 存在复数文件，仅处理第一个
+[2026-06-16 11:30:11] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 402 Payment Required"
+[2026-06-16 11:30:11] ERROR [generatedirectory.py:150 _rewrite_treedirectory()] - 调用AI接口失败（段 1/2）：Error code: 402 - {'error': {'message': 'Insufficient Balance', 'type': 'unknown_error', 'param': None, 'code': 'invalid_request_error'}}
+[2026-06-16 11:30:11] WARNING [generatedirectory.py:217 rewrite_treenode()] - rewritedirectory.txt 第 182 行格式不符合: 182  a)会议费 1
+[2026-06-16 11:30:11] WARNING [generatedirectory.py:217 rewrite_treenode()] - rewritedirectory.txt 第 184 行格式不符合: 184  c)专家咨询费 1
+[2026-06-16 11:30:11] INFO [generatedirectory.py:289 rewrite_treenode()] - 已更新 D:\compile\Test\output\大模型课题一任务书-2025.09.03-【终稿】_extract\rewritedirectorytreenode.json

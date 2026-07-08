@@ -331,7 +331,13 @@ def _generate_leaf(level_queues: Dict[int, list], selected_path: str, nodes_dict
                         rag_content = ''
                         try:
                             if basequery is not None:
-                                rag_results = basequery(3, new_theme, full_result=False)
+                                # 将 new_theme 与当前文字块的题目合并为检索主题（以空格分隔）
+                                try:
+                                    title_str = str(node.get('题目', '')).strip()
+                                except Exception:
+                                    title_str = ''
+                                query_topic = ' '.join([t for t in (new_theme, title_str) if t])
+                                rag_results = basequery(3, query_topic, full_result=False)
                                 if isinstance(rag_results, list) and rag_results:
                                     # 简单格式化每条参考为独立行，避免大段复制
                                     rag_content = '\n'.join([f"- {r}" for r in rag_results if isinstance(r, str)])
@@ -572,7 +578,7 @@ def _collect_text(selected_path: str) -> None:
         logger.error("_collect_text 写入 rewrite.txt 失败: %s", e)
 
 
-def generatetext(output_dir: str, work_dir: str):
+def generatetext(output_dir: str, work_dir: str, theme: Optional[str] = None):
     # 日志设置
     log_file = get_log_file_path(work_dir)
     setup_logger(log_file, console=True)
@@ -591,8 +597,11 @@ def generatetext(output_dir: str, work_dir: str):
             _, level_queues, nodes_dict = result
             # 初始化所有节点的 "已生成" 位为 0
             initialize_generated_flags(selected_path)
-            # 在生成前请求用户输入主题，并将其传递给生成函数
-            new_theme = ask_theme()
+            # 使用传入的主题（如果有），否则请求用户输入一次主题
+            if theme and isinstance(theme, str) and theme.strip():
+                new_theme = theme.strip()
+            else:
+                new_theme = ask_theme()
             # 执行生成（测试模式：ai 调用被注释，写入测试标记）
             _generate_leaf(level_queues, selected_path, nodes_dict, new_theme)
             # 收集并处理剩余未生成节点，再次生成（按层队列，从下到上处理，写回 JSON）

@@ -1,0 +1,3 @@
+[2026-06-16 15:57:41] INFO [search.py:56 search()] - 管线开始，output_dir=d:\compile\Test\output work_dir=d:\compile\Test
+[2026-06-16 15:57:41] INFO [search.py:130 search()] - 使用缓存的索引：d:\compile\Test\input （200 文档块）
+[2026-06-16 15:57:41] INFO [_client.py:1025 _send_single_request()] - HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
